@@ -10,5 +10,7 @@ opencv-python-headless
 dlib
 # face_recognition is a high-level library that simplifies dlib
 face_recognition
+# face-recognition-models contains the pre-trained .dat files
+face-recognition-models
 # numpy is required for all image processing arrays
 numpy
