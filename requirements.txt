@@ -1,16 +1,18 @@
 # --- Core UI ---
-# Used for the modern GUI, just like the AI Corrector project
 customtkinter
 Pillow
 
 # --- DIP & Face Recognition (Object Recognition Unit 6) ---
 # opencv is for basic image processing (DIP Units 2, 4, 5)
 opencv-python-headless
-# dlib provides the core face detection and recognition models
-dlib
-# face_recognition is a high-level library that simplifies dlib
-face_recognition
-# face-recognition-models contains the pre-trained .dat files
-face-recognition-models
 # numpy is required for all image processing arrays
 numpy
+
+# --- Modern Face Recognition Library (Python 3.13+) ---
+# Replaces dlib and face_recognition.
+# This is the "latest, best, free" library.
+deepface
+
+# DeepFace uses tensorflow as its main backend.
+# We pin this version to avoid download issues.
+tensorflow-cpu-aws
