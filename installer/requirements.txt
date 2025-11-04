@@ -1,0 +1,4 @@
+# Requirements for building the installer EXE itself
+pyinstaller
+pywin32
+customtkinter
