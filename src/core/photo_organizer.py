@@ -45,40 +45,32 @@ def run_face_analysis(ref_folder, event_image_paths, output_folder, update_statu
         update_status_callback (function): The UI function to update progress.
     """
     
-    # DeepFace.find() builds a database (models) for the ref_folder.
-    # We must tell it to use the "VGG-Face" model, which is the default.
-    # This will pre-process the reference folder.
-    update_status_callback("Step 1/2: Learning reference faces...", 0.05)
+    # --- DeepFace Configuration and Initialization ---
+    update_status_callback("Step 1/2: Learning reference faces and preparing database...", 0.05)
     
-    # This command forces DeepFace to build its model representations for the ref_folder
-    # It might download models on the first run.
+    # Force DeepFace to build its representation file if it hasn't already.
+    # We use event_image_paths[0] just as a dummy query image.
     try:
-        # We find a "dummy" file against the database to force it to build
-        # This is a standard way to initialize DeepFace's database
         DeepFace.find(
             img_path=event_image_paths[0], 
             db_path=ref_folder, 
             model_name='VGG-Face', 
-            enforce_detection=False
+            enforce_detection=False,
+            silent=True 
         )
     except Exception as e:
-        # This might fail if the first image has no face, which is fine
-        # We are just trying to initialize the model.
-        print(f"DeepFace init (this is normal): {e}")
+        # Ignore first attempt error, as it's just meant to initialize the DB
+        pass
 
-    update_status_callback(f"Step 1/2: Reference database built. Starting analysis...", 0.2)
+    update_status_callback(f"Step 1/2: Reference database ready. Starting photo analysis...", 0.2)
     
     total_images = len(event_image_paths)
-    found_matches = False
-    
-    # This will hold our final results
-    # {"path/to/image.jpg": ["Komal", "Rahul"], ...}
     photo_to_people_map = {}
     
     # --- Step 2: Loop through every event photo and match it ---
     for i, image_path in enumerate(event_image_paths):
         filename = os.path.basename(image_path)
-        progress = 0.2 + (0.6 * (i / total_images)) # This step is 60% of the work
+        progress = 0.2 + (0.6 * (i / total_images)) 
         
         update_status_callback(
             f"Step 2/2: Analyzing {filename} ({i+1}/{total_images})...", 
@@ -86,62 +78,52 @@ def run_face_analysis(ref_folder, event_image_paths, output_folder, update_statu
         )
         
         try:
-            # This is the core DIP logic!
-            # It compares one "needle" (image_path) against the "haystack" (ref_folder)
-            # dfs = "DataFrames"
+            # DeepFace.find() returns a list of dataframes.
+            # Each dataframe represents the matches found for one face detected in the query image.
             dfs = DeepFace.find(
                 img_path=image_path,
                 db_path=ref_folder,
                 model_name='VGG-Face',
-                enforce_detection=False # Don't crash if no face is found
+                enforce_detection=False,
+                silent=True
             )
             
-            # dfs is a list of DataFrames. We only care about the first one.
-            # This DataFrame has an 'identity' column with paths to the matches.
-            # e.g., "C:/.../Reference/Komal.jpg"
-            if not dfs[0].empty:
-                # Get the 'identity' column and remove duplicates
-                identities = dfs[0]['identity'].unique()
-                
-                # Get the names from the file paths
-                names = set()
-                for id_path in identities:
-                    # "C:/.../Reference/Komal.jpg" -> "Komal"
-                    name = os.path.splitext(os.path.basename(id_path))[0]
-                    names.add(name)
-                
-                if names:
-                    print(f"Found {list(names)} in {filename}")
-                    photo_to_people_map[image_path] = list(names)
-                    found_matches = True
-                else:
-                    photo_to_people_map[image_path] = [] # Found a face, but no match
+            found_names_in_this_photo = set()
+
+            # Iterate over the list of DataFrames returned by DeepFace.find()
+            for df in dfs:
+                if not df.empty:
+                    # In each non-empty DataFrame, the 'identity' column contains the file path
+                    # of the reference image match. We take the TOP result.
+                    identity_path = df['identity'].iloc[0]
+                    
+                    # Extract the person's name from the reference file path
+                    name = os.path.splitext(os.path.basename(identity_path))[0]
+                    found_names_in_this_photo.add(name)
+
+            if found_names_in_this_photo:
+                print(f"Matched {list(found_names_in_this_photo)} in {filename}")
+                photo_to_people_map[image_path] = list(found_names_in_this_photo)
             else:
-                 photo_to_people_map[image_path] = [] # No faces found
+                 photo_to_people_map[image_path] = [] 
                  
         except Exception as e:
-            print(f"Error processing {filename}: {e}")
-            photo_to_people_map[image_path] = [] # Error on this file, list as no match
+            print(f"Warning: Skipping {filename} due to processing error: {e}")
+            photo_to_people_map[image_path] = [] 
 
-    # --- Step 3: Sort the files based on the results ---
-    if not found_matches:
-        print("No matches found in any photos.")
-        
+    # --- Step 3: Sort the files based on the results (Move to new folders) ---
     update_status_callback("Sorting files into output folders...", 0.9)
     
-    # We will also create a folder for all photos that had
-    # no recognized people in them.
     unknown_folder = os.path.join(output_folder, "_NoMatches")
     os.makedirs(unknown_folder, exist_ok=True)
     
     all_matched_photos = set()
 
-    # First, copy photos for recognized people
+    # Copy photos for recognized people
     for image_path, names in photo_to_people_map.items():
         if names:
             all_matched_photos.add(image_path)
             for name in names:
-                # "Output_Folder/Komal"
                 person_folder = os.path.join(output_folder, name)
                 os.makedirs(person_folder, exist_ok=True)
                 
@@ -151,12 +133,15 @@ def run_face_analysis(ref_folder, event_image_paths, output_folder, update_statu
                 if not os.path.exists(destination_path):
                     shutil.copy2(image_path, destination_path)
                     
-    # Second, copy photos with no matches
-    for image_path in photo_to_people_map.keys():
-        if image_path not in all_matched_photos:
-            filename = os.path.basename(image_path)
-            destination_path = os.path.join(unknown_folder, filename)
-            if not os.path.exists(destination_path):
-                shutil.copy2(image_path, destination_path)
+    # Copy photos with no matches
+    # We check the original event folder path (from the first image's directory)
+    if event_image_paths:
+        original_event_dir = os.path.dirname(event_image_paths[0])
+        for image_path in find_images(original_event_dir):
+            if image_path not in all_matched_photos:
+                filename = os.path.basename(image_path)
+                destination_path = os.path.join(unknown_folder, filename)
+                if not os.path.exists(destination_path):
+                    shutil.copy2(image_path, destination_path)
 
     print("Sorting complete.")
