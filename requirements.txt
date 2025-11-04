@@ -1,15 +1,17 @@
-# Face Folio: Digital Image Processing Dependencies
+# Face Folio: ALL Project Dependencies (Application + Installer Tools)
 
-# --- Core UI ---
+# --- Core UI (Required by main.py and installer_ui.py) ---
 customtkinter
 Pillow
 
 # --- DIP & Face Recognition (Object Recognition Unit 6) ---
-# We use Python 3.11 for TensorFlow/DeepFace compatibility
+# Requires Python 3.11 for TensorFlow/DeepFace stability
 opencv-python-headless
 numpy
 deepface
 tensorflow-cpu
-
-# --- Keras Compatibility Layer (Required for DeepFace's backend) ---
 tf-keras
+
+# --- Installer Build Tools (Required for creating the final .exe) ---
+pyinstaller
+pywin32
