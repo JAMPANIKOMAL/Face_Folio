@@ -4,13 +4,13 @@ block_cipher = None
 
 # This collects files from the 'src' directory, treating it as a package.
 a = Analysis(
-    ['main.py'],
+    ['../main.py'],
     pathex=['.'],
     binaries=[],
     datas=[
-        ('assets/app_logo.ico', 'assets'),
-        ('assets/app_logo.png', 'assets'),
-        ('src', 'src'), # Include the entire source folder
+        ('../assets/app_logo.ico', 'assets'),
+        ('../assets/app_logo.png', 'assets'),
+        ('../src', 'src'), # Include the entire source folder
     ],
     hiddenimports=[
         'customtkinter',
