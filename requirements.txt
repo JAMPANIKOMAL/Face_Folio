@@ -3,15 +3,12 @@ customtkinter
 Pillow
 
 # --- DIP & Face Recognition (Object Recognition Unit 6) ---
-# opencv is for basic image processing (DIP Units 2, 4, 5)
 opencv-python-headless
-# numpy is required for all image processing arrays
 numpy
 
 # --- Modern Face Recognition Library (Python 3.11+) ---
-# Replaces dlib and face_recognition.
 deepface
-
-# DeepFace uses tensorflow as its main backend.
-# tensorflow-cpu is the correct package for CPU-only.
 tensorflow-cpu
+
+# --- Keras 3.0 Compatibility (Required by DeepFace's retina-face dependency) ---
+tf-keras
