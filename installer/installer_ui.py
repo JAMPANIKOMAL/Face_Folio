@@ -484,7 +484,7 @@ class InstallerApp(ctk.CTk):
     def install_files(self):
         """Install application files (runs in background thread)"""
         try:
-            total_steps = 5
+            total_steps = 6 # UPDATED: Total steps is now 6
             current_step = 0
             
             # Step 1: Create installation directory
@@ -497,38 +497,45 @@ class InstallerApp(ctk.CTk):
                 raise Exception(f"Permission denied. Please choose a different installation location.")
             current_step += 1
             
-            # Step 2: Copy application files (the PyInstaller bundle)
-            self.update_progress(current_step / total_steps, "Copying application files (~550MB)...", "This may take a moment.")
+            # ------------------------------------------------------------------
+            # START OF CORRECTION FOR --onefile BUILD
+            # Step 2: Copy main executable file (The Fix for 'bundle not found')
+            self.update_progress(current_step / total_steps, "Copying main application executable...", "This file contains the core logic and dependencies.")
             
-            app_bundle_src = os.path.join(self.source_folder, "FaceFolio")
-            
-            if not os.path.exists(app_bundle_src):
-                # The PyInstaller build failed or the installer was not built correctly.
-                # In a real scenario, this would only happen if the developer messed up the build phase.
-                # We need the user to run 'pyinstaller config/FaceFolio.spec' first!
-                raise Exception(f"Application bundle not found. Please ensure 'pyinstaller config/FaceFolio.spec' was run first.")
-            
-            for item in os.listdir(app_bundle_src):
-                s = os.path.join(app_bundle_src, item)
-                d = os.path.join(self.install_location, item)
-                if os.path.isdir(s):
-                    shutil.copytree(s, d)
-                else:
-                    shutil.copy2(s, d)
-            
+            main_exe_filename = "FaceFolio.exe"
+            # PyInstaller places the embedded file directly in the runtime temp directory
+            embedded_exe_src = os.path.join(self.source_folder, main_exe_filename)
+
+            if not os.path.exists(embedded_exe_src):
+                # This is the corrected check that looks for the EXE file
+                raise Exception(f"Application bundle not found inside installer package. Please ensure the main application was built successfully in Step 1.")
+
+            # Copy the single EXE file to the installation location
+            shutil.copy2(embedded_exe_src, self.install_location)
             current_step += 1
+
+            # Step 3: Copy Assets (Necessary because icons/assets are separate in --onefile)
+            self.update_progress(current_step / total_steps, "Copying required assets (icons)...", "")
+            assets_src = os.path.join(self.source_folder, "assets")
+            assets_dst = os.path.join(self.install_location, "assets")
+            if os.path.exists(assets_src):
+                # Copy the entire assets directory
+                shutil.copytree(assets_src, assets_dst)
+            current_step += 1
+            # END OF CORRECTION FOR --onefile BUILD
+            # ------------------------------------------------------------------
             
-            # Step 3: Create uninstaller script
+            # Step 4: Create uninstaller script (Original Step 3)
             self.update_progress(current_step / total_steps, "Creating uninstaller...", "")
             self.create_uninstaller()
             current_step += 1
 
-            # Step 4: Create shortcuts
+            # Step 5: Create shortcuts (Original Step 4)
             self.update_progress(current_step / total_steps, "Creating shortcuts...", "")
             self.create_shortcuts()
             current_step += 1
             
-            # Step 5: Register installation
+            # Step 6: Register installation (Original Step 5)
             self.update_progress(current_step / total_steps, "Registering installation...", "")
             self.register_installation()
             current_step += 1
