@@ -74,7 +74,7 @@ Face_Folio/
 
 ### End Users
 
-Download and run the built installer: `FaceFolio-Setup-v1.0.exe`. No Python required. The DeepFace model will download on first run.
+Download and run the built installer: [FaceFolio-Setup-v1.0.exe](dist/FaceFolio-Setup-v1.0.exe). No Python required. The DeepFace model will download on first run.
 
 ### Developers
 
@@ -123,11 +123,6 @@ Output: `dist/FaceFolio-Setup-v1.0.exe`.
 ## Team
 
 Primary Developer: Jampani Komal
-
-Roles (example):
-- DIP / Model Specialist — DeepFace integration, comparison logic  
-- Application & Integration Engineer — GUI, installer scripts, packaging  
-- Documentation & Testing Lead — Project report and validation
 
 Academic Year: 2024–2025
 

@@ -24,6 +24,7 @@ pip-wheel-metadata/
 # PyInstaller creates build/ and dist/ by default
 # keep spec files in source control if they are handwritten; ignore build artifacts
 build/
+*.spec
 
 # Installer folder outputs (if generated)
 installer/build/
