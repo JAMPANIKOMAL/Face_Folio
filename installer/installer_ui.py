@@ -511,7 +511,9 @@ class InstallerApp(ctk.CTk):
                 raise Exception(f"Application bundle not found inside installer package. Please ensure the main application was built successfully in Step 1.")
 
             # Copy the single EXE file to the installation location
-            shutil.copy2(embedded_exe_src, self.install_location)
+            shutil.copy(embedded_exe_src, self.install_location)
+            # Ensure the executable flag is set (important for onefile bundles on some systems)
+            os.chmod(os.path.join(self.install_location, main_exe_filename), 0o777)
             current_step += 1
 
             # Step 3: Copy Assets (Necessary because icons/assets are separate in --onefile)
