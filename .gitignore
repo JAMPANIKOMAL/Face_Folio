@@ -1,0 +1,111 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+env/
+venv/
+ENV/
+.venv/
+build/
+dist/
+*.egg-info/
+pip-wheel-metadata/
+*.egg
+
+# Installer / PyInstaller
+# PyInstaller creates build/ and dist/ by default
+# keep spec files in source control if they are handwritten; ignore build artifacts
+build/
+dist/
+
+# Installer folder outputs (if generated)
+installer/build/
+installer/dist/
+
+# Unit test / coverage
+.coverage
+.tox/
+.nox/
+.pytest_cache/
+.coverage.*
+htmlcov/
+
+# Pyre type checker
+.pyre/
+
+# Mypy
+.mypy_cache/
+
+# Editor directories and files
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# Environment variables / secrets
+.env
+.env.*
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# MacOS files
+*.DS_Store
+
+# VS Code settings
+.vscode/
+
+# Python virtual envs
+venv/
+ENV/
+env/
+.venv/
+
+# Compiled Python files
+*.pyc
+*.pyo
+
+# SQLite DBs
+*.sqlite3
+
+# Certificates
+*.pem
+
+# Other
+*.cache
+
+# Ignore installed python packages (egg or wheel caches)
+.eggs/
+
+# wheel & egg
+*.whl
+*.egg-info/
+
+# Node (if any frontend tooling exists)
+node_modules/
+
+# Temporary files
+*.tmp
+*~
+
+# JetBrains
+.idea/
+
+# Build artifacts from CI
+.gradle/
+
+# End of file

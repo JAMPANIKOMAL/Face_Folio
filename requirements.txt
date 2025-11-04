@@ -1,0 +1,14 @@
+# --- Core UI ---
+# Used for the modern GUI, just like the AI Corrector project
+customtkinter
+Pillow
+
+# --- DIP & Face Recognition (Object Recognition Unit 6) ---
+# opencv is for basic image processing (DIP Units 2, 4, 5)
+opencv-python-headless
+# dlib provides the core face detection and recognition models
+dlib
+# face_recognition is a high-level library that simplifies dlib
+face_recognition
+# numpy is required for all image processing arrays
+numpy
