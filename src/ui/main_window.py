@@ -10,9 +10,9 @@ from tkinter import filedialog, messagebox
 from PIL import Image
 
 # --- NEW IMPORTS ---
-# We will import these in the next step, but add them now
-# from core.photo_organizer import find_images, sort_photos_into_folders
-# from core.face_recognition import learn_known_faces, match_faces_in_photos
+# We are now importing all our real functions from the core files
+from core.photo_organizer import find_images, sort_photos_into_folders
+from core.face_recognition import learn_known_faces, match_faces_in_photos
 # --- END NEW IMPORTS ---
 
 
@@ -55,14 +55,14 @@ class App(ctk.CTk):
         self.current_theme = DARK_THEME if self.current_theme_name == "Dark" else LIGHT_THEME
 
         # --- State Variables ---
-        self.reference_folder = ctk.StringVar() # <-- NEW
-        self.event_folder = ctk.StringVar()     # <-- RENAMED (was input_folder)
+        self.reference_folder = ctk.StringVar()
+        self.event_folder = ctk.StringVar()
         self.output_folder = ctk.StringVar()
         self.is_processing = False
 
         # --- Window Configuration ---
         self.title("Face Folio - Photo Organizer")
-        self.geometry("800x500") # Adjusted height for new button
+        self.geometry("800x500") 
         self.minsize(600, 450)
         self.configure(fg_color=self.current_theme["BG_COLOR"])
 
@@ -84,7 +84,7 @@ class App(ctk.CTk):
         self.main_frame.grid(row=1, column=0, sticky="nsew", padx=40, pady=20)
         self.main_frame.grid_columnconfigure(1, weight=1)
 
-        # --- vvv NEW: Reference Folder vvv ---
+        # --- Reference Folder ---
         self.ref_label = ctk.CTkLabel(
             self.main_frame,
             text="1. Select Reference Folder:",
@@ -109,26 +109,25 @@ class App(ctk.CTk):
             self.main_frame,
             text="Browse...",
             font=ctk.CTkFont(size=12, weight="bold"),
-            command=self.select_reference_folder, # <-- NEW function
+            command=self.select_reference_folder, 
             fg_color=self.current_theme["BTN_COLOR"],
             text_color=self.current_theme["BTN_TEXT_COLOR"],
             hover_color=self.current_theme["BTN_HOVER_COLOR"]
         )
         self.ref_btn.grid(row=0, column=2, sticky="e", padx=(10, 0), pady=10)
-        # --- ^^^ END NEW ^^^ ---
 
-        # --- Event Folder (was Input Folder) ---
+        # --- Event Folder ---
         self.event_label = ctk.CTkLabel(
             self.main_frame,
-            text="2. Select Event Folder:", # <-- RENAMED
+            text="2. Select Event Folder:", 
             font=ctk.CTkFont(size=14, weight="bold"),
             text_color=self.current_theme["TEXT_COLOR"]
         )
-        self.event_label.grid(row=1, column=0, sticky="w", padx=(0, 10), pady=10) # <-- Row 1
+        self.event_label.grid(row=1, column=0, sticky="w", padx=(0, 10), pady=10)
 
         self.event_entry = ctk.CTkEntry(
             self.main_frame,
-            textvariable=self.event_folder, # <-- RENAMED
+            textvariable=self.event_folder,
             state="disabled",
             font=ctk.CTkFont(size=12),
             fg_color=self.current_theme["ENTRY_COLOR"],
@@ -136,27 +135,27 @@ class App(ctk.CTk):
             border_color=self.current_theme["BORDER_COLOR"],
             border_width=1
         )
-        self.event_entry.grid(row=1, column=1, sticky="ew", pady=10) # <-- Row 1
+        self.event_entry.grid(row=1, column=1, sticky="ew", pady=10)
 
         self.event_btn = ctk.CTkButton(
             self.main_frame,
             text="Browse...",
             font=ctk.CTkFont(size=12, weight="bold"),
-            command=self.select_event_folder, # <-- RENAMED
+            command=self.select_event_folder,
             fg_color=self.current_theme["BTN_COLOR"],
             text_color=self.current_theme["BTN_TEXT_COLOR"],
             hover_color=self.current_theme["BTN_HOVER_COLOR"]
         )
-        self.event_btn.grid(row=1, column=2, sticky="e", padx=(10, 0), pady=10) # <-- Row 1
+        self.event_btn.grid(row=1, column=2, sticky="e", padx=(10, 0), pady=10)
 
         # --- Output Folder ---
         self.output_label = ctk.CTkLabel(
             self.main_frame,
-            text="3. Select Output Folder:", # <-- RENAMED
+            text="3. Select Output Folder:",
             font=ctk.CTkFont(size=14, weight="bold"),
             text_color=self.current_theme["TEXT_COLOR"]
         )
-        self.output_label.grid(row=2, column=0, sticky="w", padx=(0, 10), pady=10) # <-- Row 2
+        self.output_label.grid(row=2, column=0, sticky="w", padx=(0, 10), pady=10)
 
         self.output_entry = ctk.CTkEntry(
             self.main_frame,
@@ -168,7 +167,7 @@ class App(ctk.CTk):
             border_color=self.current_theme["BORDER_COLOR"],
             border_width=1
         )
-        self.output_entry.grid(row=2, column=1, sticky="ew", pady=10) # <-- Row 2
+        self.output_entry.grid(row=2, column=1, sticky="ew", pady=10)
 
         self.output_btn = ctk.CTkButton(
             self.main_frame,
@@ -179,7 +178,7 @@ class App(ctk.CTk):
             text_color=self.current_theme["BTN_TEXT_COLOR"],
             hover_color=self.current_theme["BTN_HOVER_COLOR"]
         )
-        self.output_btn.grid(row=2, column=2, sticky="e", padx=(10, 0), pady=10) # <-- Row 2
+        self.output_btn.grid(row=2, column=2, sticky="e", padx=(10, 0), pady=10)
 
         # --- Start Button ---
         self.start_btn = ctk.CTkButton(
@@ -192,11 +191,11 @@ class App(ctk.CTk):
             hover_color=self.current_theme["BTN_HOVER_COLOR"],
             height=40
         )
-        self.start_btn.grid(row=3, column=0, columnspan=3, sticky="ew", padx=0, pady=(20, 0)) # <-- Row 3
+        self.start_btn.grid(row=3, column=0, columnspan=3, sticky="ew", padx=0, pady=(20, 0))
 
         # --- Status Frame (at bottom) ---
         self.status_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.status_frame.grid(row=2, column=0, sticky="ew", padx=40, pady=(0, 20)) # <-- Row 2
+        self.status_frame.grid(row=2, column=0, sticky="ew", padx=40, pady=(0, 20))
         self.status_frame.grid_columnconfigure(0, weight=1)
 
         self.status_label = ctk.CTkLabel(
@@ -230,7 +229,6 @@ class App(ctk.CTk):
         # --- Bind window close ---
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
-    # --- vvv NEW/RENAMED FUNCTIONS vvv ---
     def select_reference_folder(self):
         """Open dialog to select the reference (known faces) folder."""
         folder_path = filedialog.askdirectory(title="Select Reference Folder (Known People)")
@@ -242,7 +240,6 @@ class App(ctk.CTk):
         folder_path = filedialog.askdirectory(title="Select Event Photo Folder (All Photos)")
         if folder_path:
             self.event_folder.set(folder_path)
-    # --- ^^^ END NEW/RENAMED ^^^ ---
 
     def select_output_folder(self):
         """Open dialog to select the destination folder."""
@@ -259,7 +256,6 @@ class App(ctk.CTk):
             print("Already processing.")
             return
 
-        # --- vvv VALIDATION LOGIC UPDATED vvv ---
         ref_folder = self.reference_folder.get()
         event_folder = self.event_folder.get()
         out_folder = self.output_folder.get()
@@ -277,65 +273,62 @@ class App(ctk.CTk):
         if ref_folder == event_folder or ref_folder == out_folder or event_folder == out_folder:
             messagebox.showwarning("Warning", "All three folders must be different.")
             return
-        # --- ^^^ END VALIDATION ^^^ ---
 
-        # Disable UI elements
         self.set_ui_processing_state(True)
         
-        # Start the actual work in a new thread
         process_thread = threading.Thread(
             target=self.start_processing, 
-            args=(ref_folder, event_folder, out_folder), # <-- Pass all 3 paths
+            args=(ref_folder, event_folder, out_folder),
             daemon=True
         )
         process_thread.start()
 
 
-    # vvv --- THIS FUNCTION IS THE MAIN CHANGE --- vvv
+    # vvv --- THIS FUNCTION IS THE MAIN CHANGE (NO SIMULATION) --- vvv
     def start_processing(self, ref_folder, event_folder, out_folder):
         """
-        THE CORE LOGIC.
-        This runs in a separate thread.
-        We are now calling our core DIP functions.
+        THE REAL CORE LOGIC.
+        This runs in a separate thread and calls our core functions.
         """
         print(f"Processing started: {ref_folder}, {event_folder} -> {out_folder}")
         
         try:
-            # --- We will build these functions in the next step ---
-            # from core.face_recognition import learn_known_faces, match_faces_in_photos
-            # from core.photo_organizer import find_images, sort_photos_into_folders
-
             # --- Step 1: Learn Known Faces ---
-            self.update_status("Step 1/4: Learning faces from Reference folder...", 0.0)
-            # known_faces_dict = learn_known_faces(ref_folder)
-            print("SIM: Learning known faces...")
-            import time; time.sleep(1) # Simulation
-            # if not known_faces_dict:
-            #     raise Exception("No faces found in reference folder.")
+            # We pass 'self.update_status' to the function
+            # so it can update the progress bar from inside the loop.
+            known_faces_dict = learn_known_faces(ref_folder, self.update_status)
+            
+            if not known_faces_dict:
+                raise Exception("No faces were learned from the Reference Folder.")
+            
+            self.update_status("Step 1/4: Finished learning known faces.", 0.25)
             
             # --- Step 2: Find all event photos ---
             self.update_status("Step 2/4: Finding all photos in Event folder...", 0.25)
-            # event_image_paths = find_images(event_folder)
-            print("SIM: Finding event photos...")
-            time.sleep(1) # Simulation
-            # if not event_image_paths:
-            #     raise Exception("No images found in event folder.")
+            event_image_paths = find_images(event_folder)
+            
+            if not event_image_paths:
+                raise Exception("No valid images found in the Event Folder.")
+
+            self.update_status(f"Step 2/4: Found {len(event_image_paths)} event photos.", 0.25)
 
             # --- Step 3: Match faces in event photos ---
-            self.update_status("Step 3/4: Matching faces in event photos...", 0.5)
-            # This is the slowest step and will need to report progress
-            # photo_to_people_map = match_faces_in_photos(event_image_paths, known_faces_dict, self.update_status)
-            print("SIM: Matching faces...")
-            time.sleep(2) # Simulation
+            # This is the slowest step. We pass the callback function
+            # to it so it can update the progress bar *during* its loop.
+            photo_to_people_map = match_faces_in_photos(
+                event_image_paths, 
+                known_faces_dict, 
+                self.update_status
+            )
+            
+            self.update_status("Step 3/4: Finished matching faces.", 0.75)
             
             # --- Step 4: Sort photos ---
             self.update_status("Step 4/4: Sorting photos into output folders...", 0.9)
-            # sort_photos_into_folders(photo_to_people_map, out_folder)
-            print("SIM: Sorting photos...")
-            time.sleep(1) # Simulation
+            sort_photos_into_folders(photo_to_people_map, out_folder)
             
-            self.update_status("Processing complete! (Simulation)", 1.0)
-            self.after(100, lambda: messagebox.showinfo("Complete", "Photo sorting finished successfully! (Simulation)"))
+            self.update_status("Processing complete!", 1.0)
+            self.after(100, lambda: messagebox.showinfo("Complete", "Photo sorting finished successfully!"))
             
         except Exception as e:
             print(f"Error during processing: {e}")
@@ -357,7 +350,7 @@ class App(ctk.CTk):
             # Update status label
             self.status_label.configure(text=message)
             if "Error" in message:
-                self.status_label.configure(text_color="red") # Or some theme color
+                self.status_label.configure(text_color="red")
             else:
                 self.status_label.configure(text_color=self.current_theme["TEXT_COLOR"])
             
@@ -372,7 +365,6 @@ class App(ctk.CTk):
         state = "disabled" if is_processing else "normal"
         
         def _update_ui():
-            # Update all 3 buttons
             self.ref_btn.configure(state=state)
             self.event_btn.configure(state=state)
             self.output_btn.configure(state=state)
@@ -407,11 +399,10 @@ class App(ctk.CTk):
             pass
 
     def update_ui_theme(self):
-        """RedGrams the UI elements with the new theme colors."""
+        """Redraws the UI elements with the new theme colors."""
         self.configure(fg_color=self.current_theme["BG_COLOR"])
         self.title_label.configure(text_color=self.current_theme["TEXT_COLOR"])
 
-        # Update all 3 sections
         self.ref_label.configure(text_color=self.current_theme["TEXT_COLOR"])
         self.ref_entry.configure(
             fg_color=self.current_theme["ENTRY_COLOR"],
