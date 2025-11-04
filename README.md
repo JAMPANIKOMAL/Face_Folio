@@ -108,12 +108,6 @@ This command packages the Python application and its dependencies into a single 
 pyinstaller --noconsole --onedir --name FaceFolio --paths "src" --add-data "assets;assets" --hidden-import "tkinter" --hidden-import "tensorflow-cpu" --hidden-import "cv2" --hidden-import "deepface" --collect-all "customtkinter" --collect-all "numpy" --collect-all "PIL" --icon "assets/app_logo.ico" main.py
 ```
 
-Alternatively, use the provided spec file:
-
-```powershell
-pyinstaller FaceFolio.spec
-```
-
 Output: `dist/FaceFolio` folder.
 
 ### Step 2 — Build the complete setup installer
