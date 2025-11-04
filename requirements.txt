@@ -1,14 +1,15 @@
+# Face Folio: Digital Image Processing Dependencies
+
 # --- Core UI ---
 customtkinter
 Pillow
 
 # --- DIP & Face Recognition (Object Recognition Unit 6) ---
+# We use Python 3.11 for TensorFlow/DeepFace compatibility
 opencv-python-headless
 numpy
-
-# --- Modern Face Recognition Library (Python 3.11+) ---
 deepface
 tensorflow-cpu
 
-# --- Keras 3.0 Compatibility (Required by DeepFace's retina-face dependency) ---
+# --- Keras Compatibility Layer (Required for DeepFace's backend) ---
 tf-keras
