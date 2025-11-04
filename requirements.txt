@@ -8,11 +8,10 @@ opencv-python-headless
 # numpy is required for all image processing arrays
 numpy
 
-# --- Modern Face Recognition Library (Python 3.13+) ---
+# --- Modern Face Recognition Library (Python 3.11+) ---
 # Replaces dlib and face_recognition.
-# This is the "latest, best, free" library.
 deepface
 
 # DeepFace uses tensorflow as its main backend.
-# We pin this version to avoid download issues.
-tensorflow-cpu-aws
+# tensorflow-cpu is the correct package for CPU-only.
+tensorflow-cpu

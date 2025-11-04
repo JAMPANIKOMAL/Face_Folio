@@ -10,9 +10,8 @@ from tkinter import filedialog, messagebox
 from PIL import Image
 
 # --- NEW IMPORTS ---
-# We are now importing all our real functions from the core files
-from core.photo_organizer import find_images, sort_photos_into_folders
-from core.face_recognition import learn_known_faces, match_faces_in_photos
+# We now import our new, simpler functions
+from core.photo_organizer import find_images, run_face_analysis
 # --- END NEW IMPORTS ---
 
 
@@ -283,8 +282,7 @@ class App(ctk.CTk):
         )
         process_thread.start()
 
-
-    # vvv --- THIS FUNCTION IS THE MAIN CHANGE (NO SIMULATION) --- vvv
+    # vvv --- THIS FUNCTION IS NOW CLEAN AND CALLS THE CORE LOGIC --- vvv
     def start_processing(self, ref_folder, event_folder, out_folder):
         """
         THE REAL CORE LOGIC.
@@ -293,39 +291,24 @@ class App(ctk.CTk):
         print(f"Processing started: {ref_folder}, {event_folder} -> {out_folder}")
         
         try:
-            # --- Step 1: Learn Known Faces ---
-            # We pass 'self.update_status' to the function
-            # so it can update the progress bar from inside the loop.
-            known_faces_dict = learn_known_faces(ref_folder, self.update_status)
-            
-            if not known_faces_dict:
-                raise Exception("No faces were learned from the Reference Folder.")
-            
-            self.update_status("Step 1/4: Finished learning known faces.", 0.25)
-            
-            # --- Step 2: Find all event photos ---
-            self.update_status("Step 2/4: Finding all photos in Event folder...", 0.25)
+            # --- Step 1: Find all event photos ---
+            self.update_status("Step 1/2: Finding all photos in Event folder...", 0.0)
             event_image_paths = find_images(event_folder)
             
             if not event_image_paths:
                 raise Exception("No valid images found in the Event Folder.")
 
-            self.update_status(f"Step 2/4: Found {len(event_image_paths)} event photos.", 0.25)
+            self.update_status(f"Step 1/2: Found {len(event_image_paths)} event photos.", 0.0)
 
-            # --- Step 3: Match faces in event photos ---
-            # This is the slowest step. We pass the callback function
-            # to it so it can update the progress bar *during* its loop.
-            photo_to_people_map = match_faces_in_photos(
-                event_image_paths, 
-                known_faces_dict, 
-                self.update_status
+            # --- Step 2: Run the full DeepFace analysis ---
+            # This one function does all the work and will update
+            # the status bar itself via the callback.
+            run_face_analysis(
+                ref_folder,
+                event_image_paths,
+                out_folder,
+                self.update_status # Pass the callback function
             )
-            
-            self.update_status("Step 3/4: Finished matching faces.", 0.75)
-            
-            # --- Step 4: Sort photos ---
-            self.update_status("Step 4/4: Sorting photos into output folders...", 0.9)
-            sort_photos_into_folders(photo_to_people_map, out_folder)
             
             self.update_status("Processing complete!", 1.0)
             self.after(100, lambda: messagebox.showinfo("Complete", "Photo sorting finished successfully!"))
@@ -338,8 +321,7 @@ class App(ctk.CTk):
         finally:
             # Re-enable UI elements
             self.set_ui_processing_state(False)
-    # ^^^ --- THIS FUNCTION IS THE MAIN CHANGE --- ^^^
-
+    # ^^^ --- THIS FUNCTION IS CLEAN --- ^^^
 
     def update_status(self, message, progress):
         """
