@@ -12,6 +12,7 @@ import json
 import sys
 from pathlib import Path
 import threading
+import time 
 
 try:
     import win32com.client
@@ -484,7 +485,7 @@ class InstallerApp(ctk.CTk):
     def install_files(self):
         """Install application files (runs in background thread)"""
         try:
-            total_steps = 6 # UPDATED: Total steps is now 6
+            total_steps = 5
             current_step = 0
             
             # Step 1: Create installation directory
@@ -498,46 +499,49 @@ class InstallerApp(ctk.CTk):
             current_step += 1
             
             # ------------------------------------------------------------------
-            # START OF CORRECTION FOR --onefile BUILD
-            # Step 2: Copy main executable file (The Fix for 'bundle not found')
-            self.update_progress(current_step / total_steps, "Copying main application executable...", "This file contains the core logic and dependencies.")
-            
-            main_exe_filename = "FaceFolio.exe"
-            # PyInstaller places the embedded file directly in the runtime temp directory
-            embedded_exe_src = os.path.join(self.source_folder, main_exe_filename)
+            # START OF ONEDIR RESTORATION AND DEFENSIVE COPY LOOP (Final Attempt)
+            # Step 2: Copy application bundle (Copying the extracted folder)
+            self.update_progress(current_step / total_steps, "Copying application files (Folder copy)...", "Waiting for system file lock release...")
 
-            if not os.path.exists(embedded_exe_src):
-                # This is the corrected check that looks for the EXE file
-                raise Exception(f"Application bundle not found inside installer package. Please ensure the main application was built successfully in Step 1.")
+            app_bundle_src = os.path.join(self.source_folder, "FaceFolio")
 
-            # Copy the single EXE file to the installation location
-            shutil.copy(embedded_exe_src, self.install_location)
-            # Ensure the executable flag is set (important for onefile bundles on some systems)
-            os.chmod(os.path.join(self.install_location, main_exe_filename), 0o777)
+            if not os.path.exists(app_bundle_src):
+                # This check ensures the 'FaceFolio' folder (built with --onedir) exists in the temp location
+                raise Exception(f"Application bundle folder not found inside installer package. Please ensure Step 1 created the 'dist/FaceFolio' folder.")
+
+            # --- DEFENSIVE COPY LOOP FOR SHUTIL.COPYTREE ---
+            copied_successfully = False
+            for attempt in range(10): # Try up to 10 times
+                try:
+                    # Copy the entire directory tree from the temp location to the install location
+                    shutil.copytree(app_bundle_src, self.install_location, dirs_exist_ok=True)
+                    copied_successfully = True
+                    break
+                except PermissionError:
+                    self.update_progress(current_step / total_steps, f"Directory Locked (Attempt {attempt+1}/10). Retrying...", "Security scan is in progress.")
+                    time.sleep(1) # Wait 1 second before retrying
+                except Exception as e:
+                    # Catch any other unexpected error
+                    raise Exception(f"Copy failed on attempt {attempt+1}: {e}")
+
+            if not copied_successfully:
+                raise Exception("Failed to copy FaceFolio application folder after 10 attempts. Files remain locked.")
+
             current_step += 1
-
-            # Step 3: Copy Assets (Necessary because icons/assets are separate in --onefile)
-            self.update_progress(current_step / total_steps, "Copying required assets (icons)...", "")
-            assets_src = os.path.join(self.source_folder, "assets")
-            assets_dst = os.path.join(self.install_location, "assets")
-            if os.path.exists(assets_src):
-                # Copy the entire assets directory
-                shutil.copytree(assets_src, assets_dst)
-            current_step += 1
-            # END OF CORRECTION FOR --onefile BUILD
+            # END OF ONEDIR RESTORATION
             # ------------------------------------------------------------------
             
-            # Step 4: Create uninstaller script (Original Step 3)
+            # Step 3: Create uninstaller script 
             self.update_progress(current_step / total_steps, "Creating uninstaller...", "")
             self.create_uninstaller()
             current_step += 1
 
-            # Step 5: Create shortcuts (Original Step 4)
+            # Step 4: Create shortcuts 
             self.update_progress(current_step / total_steps, "Creating shortcuts...", "")
             self.create_shortcuts()
             current_step += 1
             
-            # Step 6: Register installation (Original Step 5)
+            # Step 5: Register installation 
             self.update_progress(current_step / total_steps, "Registering installation...", "")
             self.register_installation()
             current_step += 1

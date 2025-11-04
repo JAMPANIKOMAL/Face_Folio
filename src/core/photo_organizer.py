@@ -8,42 +8,92 @@ import os
 import shutil
 import pandas as pd
 from deepface import DeepFace
+from pathlib import Path
+import zipfile
+import tempfile
 
 # Define the image extensions we want to process
 VALID_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.bmp')
 
-def find_images(folder_path):
+def find_images(input_path):
     """
-    Recursively finds all valid image files in a given folder.
+    Recursively finds all valid image files from a folder, a single file, or a ZIP archive.
     
     Args:
-        folder_path (str): The absolute path to the folder to scan.
+        input_path (str): The absolute path to the folder, file, or zip.
         
     Returns:
-        list: A list of absolute paths to all valid image files.
+        tuple: (list of absolute image paths, temporary extraction directory or None)
     """
     image_paths = []
-    print(f"Scanning for images in: {folder_path}")
-    
-    for root, dirs, files in os.walk(folder_path):
-        for file in files:
-            if file.lower().endswith(VALID_EXTENSIONS):
-                full_path = os.path.join(root, file)
-                image_paths.append(full_path)
-                
-    print(f"Found {len(image_paths)} valid images.")
-    return image_paths
+    temp_dir = None
+    input_path = Path(input_path)
 
-def run_face_analysis(ref_folder, event_image_paths, output_folder, update_status_callback):
+    if input_path.suffix.lower() == '.zip':
+        temp_dir = tempfile.mkdtemp()
+        try:
+            with zipfile.ZipFile(input_path, 'r') as zip_ref:
+                zip_ref.extractall(temp_dir)
+            
+            # Now treat the extracted temp directory as the source folder
+            for root, dirs, files in os.walk(temp_dir):
+                for file in files:
+                    if file.lower().endswith(VALID_EXTENSIONS):
+                        image_paths.append(os.path.join(root, file))
+        except Exception as e:
+            print(f"Error extracting zip: {e}")
+            if temp_dir: shutil.rmtree(temp_dir, ignore_errors=True)
+            return [], None
+    
+    elif input_path.is_file() and input_path.suffix.lower() in VALID_EXTENSIONS:
+        # Handle single photo input
+        image_paths.append(str(input_path))
+
+    elif input_path.is_dir():
+        # Handle folder input
+        for root, dirs, files in os.walk(input_path):
+            for file in files:
+                if file.lower().endswith(VALID_EXTENSIONS):
+                    image_paths.append(os.path.join(root, file))
+    
+    print(f"Found {len(image_paths)} valid images.")
+    return image_paths, temp_dir
+
+def run_face_analysis(ref_input_path, event_input_path, output_folder, update_status_callback):
     """
     The main analysis function. Uses DeepFace.find() to process all images.
-    
-    Args:
-        ref_folder (str): Path to the "Reference" folder (e.g., "Komal.jpg")
-        event_image_paths (list): List of paths to all event photos.
-        output_folder (str): Path to the "Output" folder.
-        update_status_callback (function): The UI function to update progress.
     """
+    
+    temp_dirs_to_clean = []
+
+    # 1. Process Reference Input (Folder/File/ZIP)
+    ref_image_paths, ref_temp_dir = find_images(ref_input_path)
+    if ref_temp_dir: temp_dirs_to_clean.append(ref_temp_dir)
+    
+    if not ref_image_paths:
+        # Assume if ref input is a single file, the parent directory is the DB path.
+        # This is complex, so let's enforce a structured reference folder.
+        # DeepFace DB needs a path, not a list of files.
+        if Path(ref_input_path).is_file():
+             raise Exception("Reference input must be a folder containing named subfolders/images or a ZIP of a structured folder.")
+        ref_db_path = str(ref_input_path)
+    elif ref_temp_dir:
+        # If it was a ZIP, use the temp directory as the database path
+        ref_db_path = ref_temp_dir
+    else:
+        # If it was a folder, use the folder path as the database path
+        ref_db_path = str(ref_input_path)
+
+
+    # 2. Process Event Input (Folder/File/ZIP)
+    event_image_paths, event_temp_dir = find_images(event_input_path)
+    if event_temp_dir: temp_dirs_to_clean.append(event_temp_dir)
+
+    if not event_image_paths:
+        # Clean up any reference temp files before raising an error
+        for d in temp_dirs_to_clean: shutil.rmtree(d, ignore_errors=True)
+        raise Exception("No valid images found in the Event Input.")
+
     
     # --- DeepFace Configuration and Initialization ---
     update_status_callback("Step 1/2: Learning reference faces and preparing database...", 0.05)
@@ -53,7 +103,7 @@ def run_face_analysis(ref_folder, event_image_paths, output_folder, update_statu
     try:
         DeepFace.find(
             img_path=event_image_paths[0], 
-            db_path=ref_folder, 
+            db_path=ref_db_path, 
             model_name='VGG-Face', 
             enforce_detection=False,
             silent=True 
@@ -78,11 +128,9 @@ def run_face_analysis(ref_folder, event_image_paths, output_folder, update_statu
         )
         
         try:
-            # DeepFace.find() returns a list of dataframes.
-            # Each dataframe represents the matches found for one face detected in the query image.
             dfs = DeepFace.find(
                 img_path=image_path,
-                db_path=ref_folder,
+                db_path=ref_db_path, # Use the path derived from the input (could be temp dir)
                 model_name='VGG-Face',
                 enforce_detection=False,
                 silent=True
@@ -90,15 +138,20 @@ def run_face_analysis(ref_folder, event_image_paths, output_folder, update_statu
             
             found_names_in_this_photo = set()
 
-            # Iterate over the list of DataFrames returned by DeepFace.find()
             for df in dfs:
                 if not df.empty:
-                    # In each non-empty DataFrame, the 'identity' column contains the file path
-                    # of the reference image match. We take the TOP result.
-                    identity_path = df['identity'].iloc[0]
+                    # Get the identity path of the top match
+                    identity_path = Path(df['identity'].iloc[0])
                     
-                    # Extract the person's name from the reference file path
-                    name = os.path.splitext(os.path.basename(identity_path))[0]
+                    # FIX: Extract the person's name using the parent folder name
+                    # DeepFace uses the folder containing the image as the identity.
+                    name = identity_path.parent.name
+                    
+                    # Ensure name is not the DB root name if DeepFace flattens it
+                    if name == Path(ref_db_path).name:
+                         # Fallback if DB structure is flat (e.g. Komal.jpg is in /ref_db_path)
+                         name = identity_path.stem 
+                         
                     found_names_in_this_photo.add(name)
 
             if found_names_in_this_photo:
@@ -131,17 +184,19 @@ def run_face_analysis(ref_folder, event_image_paths, output_folder, update_statu
                 destination_path = os.path.join(person_folder, filename)
                 
                 if not os.path.exists(destination_path):
-                    shutil.copy2(image_path, destination_path)
+                    # Use shutil.copy for robustness against permissions
+                    shutil.copy(image_path, destination_path)
                     
-    # Copy photos with no matches
-    # We check the original event folder path (from the first image's directory)
-    if event_image_paths:
-        original_event_dir = os.path.dirname(event_image_paths[0])
-        for image_path in find_images(original_event_dir):
-            if image_path not in all_matched_photos:
-                filename = os.path.basename(image_path)
-                destination_path = os.path.join(unknown_folder, filename)
-                if not os.path.exists(destination_path):
-                    shutil.copy2(image_path, destination_path)
+    # Copy photos with no matches (only photos from the event input that weren't matched)
+    for image_path in event_image_paths:
+        if image_path not in all_matched_photos:
+            filename = os.path.basename(image_path)
+            destination_path = os.path.join(unknown_folder, filename)
+            if not os.path.exists(destination_path):
+                shutil.copy(image_path, destination_path)
 
     print("Sorting complete.")
+
+    # --- Step 4: Cleanup ---
+    for d in temp_dirs_to_clean:
+        shutil.rmtree(d, ignore_errors=True)

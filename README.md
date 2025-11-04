@@ -96,6 +96,8 @@ Step 1 — Build main app bundle:
 
 ```powershell
 # From project root with venv activated
+pyinstaller --noconsole --onedir --name FaceFolio --paths "src" --add-data "assets;assets" --hidden-import "tkinter" --hidden-import "tensorflow-cpu" --hidden-import "cv2" --hidden-import "deepface" --collect-all "customtkinter" --collect-all "numpy" --collect-all "PIL" --icon "assets/app_logo.ico" main.py
+or
 pyinstaller FaceFolio.spec
 # Output: dist/FaceFolio/FaceFolio.exe
 ```
@@ -104,6 +106,8 @@ Step 2 — Build the complete setup:
 
 ```powershell
 # Ensure dist/FaceFolio exists
+pyinstaller --noconsole --onefile --name FaceFolio-Setup-v1.0 --add-data "dist/FaceFolio;FaceFolio" --add-data "installer/uninstaller_ui.py;." --hidden-import "win32com.client" --hidden-import "win32com.shell" --hidden-import "pywintypes" --hidden-import "winreg" --hidden-import "shutil" --collect-all "customtkinter" --icon "assets/app_logo.ico" installer/installer_ui.py --uac-admin
+or
 pyinstaller installer/FaceFolio_Complete_Setup.spec
 # Output: installer/dist/FaceFolio-Setup-v1.0.exe
 ```

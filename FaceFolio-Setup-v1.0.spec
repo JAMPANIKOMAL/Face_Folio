@@ -1,9 +1,9 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('dist/FaceFolio.exe', 'FaceFolio.exe'), ('installer/uninstaller_ui.py', '.')]
+datas = [('dist/FaceFolio', 'FaceFolio'), ('installer/uninstaller_ui.py', '.')]
 binaries = []
-hiddenimports = ['win32com.client', 'winreg', 'shutil']
+hiddenimports = ['win32com.client', 'win32com.shell', 'pywintypes', 'winreg', 'shutil']
 tmp_ret = collect_all('customtkinter')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
