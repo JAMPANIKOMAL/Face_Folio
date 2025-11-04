@@ -127,9 +127,12 @@ class UninstallerApp(ctk.CTk):
         if messagebox.askyesno("Confirm Uninstall", "This action will permanently delete the application folder. Continue?"):
             try:
                 # Remove the installation directory
-                deepface_folder = os.path.join(os.path.expanduser("~"), ".deepface")
                 shutil.rmtree(self.install_location, ignore_errors=True)
-                shutil.rmtree(deepface_folder, ignore_errors=True)
+                
+                # --- BUG FIX ---
+                # Removed the line that deleted the shared .deepface cache:
+                # shutil.rmtree(deepface_folder, ignore_errors=True)
+                # --- END BUG FIX ---
                 
                 # Remove shortcuts and registry entry
                 self.remove_shortcuts()

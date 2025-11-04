@@ -456,18 +456,33 @@ class InstallerApp(ctk.CTk):
             self.location_entry.insert(0, folder)
     
     def validate_install_path(self):
-        """Validate installation path"""
+        """
+        Validate installation path.
+        - Checks for invalid characters.
+        - Checks if it's a file.
+        - Checks if it's non-empty and warns user.
+        """
         path = self.install_location
         try:
-            Path(path).parent.exists()
-        except:
-            messagebox.showerror("Invalid Path", "The installation path is invalid.")
+            p = Path(path)
+            # Check for invalid path
+            if not p.parent.exists():
+                messagebox.showerror("Invalid Path", "The installation path is invalid.")
+                return False
+        except Exception:
+            messagebox.showerror("Invalid Path", "The installation path contains invalid characters.")
             return False
         
-        if os.path.exists(path):
+        # Check if it's a file
+        if os.path.exists(path) and not os.path.isdir(path):
+            messagebox.showerror("Invalid Path", "The selected path is a file. Please select a folder.")
+            return False
+            
+        # Check if directory exists and is NOT empty
+        if os.path.exists(path) and os.path.isdir(path) and len(os.listdir(path)) > 0:
             result = messagebox.askyesno(
-                "Directory Exists",
-                f"The directory already exists:\n{path}\n\nDo you want to overwrite it?"
+                "Warning: Directory Not Empty",
+                f"The directory is not empty:\n{path}\n\nFiles may be overwritten. Do you want to continue anyway?"
             )
             if not result:
                 return False
@@ -491,11 +506,15 @@ class InstallerApp(ctk.CTk):
             # Step 1: Create installation directory
             self.update_progress(current_step / total_steps, "Creating installation directory...", "")
             try:
-                if os.path.exists(self.install_location):
-                    shutil.rmtree(self.install_location) 
-                os.makedirs(self.install_location)
+                # --- BUG FIX ---
+                # Replaced shutil.rmtree with os.makedirs(exist_ok=True)
+                # This prevents the high-severity data loss bug.
+                os.makedirs(self.install_location, exist_ok=True)
+                # --- END BUG FIX ---
             except PermissionError as e:
                 raise Exception(f"Permission denied. Please choose a different installation location.")
+            except Exception as e:
+                 raise Exception(f"Could not create directory: {e}")
             current_step += 1
             
             # ------------------------------------------------------------------

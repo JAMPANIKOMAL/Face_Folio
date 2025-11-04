@@ -1,18 +1,20 @@
 # Face Folio: Automated Photo Organizer
 
-A Digital Image Processing application that automatically sorts event photos into folders by recognized faces using DeepFace (VGG-Face). Unknown faces are copied to a `_NoMatches` folder.
+A Digital Image Processing application that automatically sorts event photos into folders by recognized faces using [DeepFace (VGG‑Face)](https://github.com/serengil/deepface). Unknown faces are copied to a `_NoMatches` folder.
 
 ## Table of Contents
 
-- About
-- Features
-- DIP Methodology Focus
-- Project Structure
-- Installation
-- Building & Distribution
-- Team
-- Technologies
-- Acknowledgments
+- [About](#about)  
+- [Features](#features)  
+- [DIP Methodology Focus](#dip-methodology-focus)  
+- [Project Structure](#project-structure)  
+- [Installation](#installation)  
+    - [End Users](#end-users)  
+    - [Developers](#developers)  
+- [Building & Distribution](#building--distribution)  
+- [Team](#team)  
+- [Technologies](#technologies)  
+- [Acknowledgments](#acknowledgments)
 
 ---
 
@@ -28,19 +30,18 @@ Core flow:
 
 ## Features
 
-- DeepFace (VGG-Face) based face recognition
-- Automated sorting of large photo collections
-- CustomTkinter-based UI
-- Asynchronous processing to keep the UI responsive
-- Local processing for privacy
-- Model downloaded on first run (approx. 550 MB)
+- Face recognition via [DeepFace (VGG‑Face)](https://github.com/serengil/deepface)  
+- Automated sorting of large photo collections  
+- GUI built with [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter)  
+- Asynchronous processing to keep the UI responsive  
+- Local processing for privacy (models downloaded on first run; ~550 MB)  
 
 ## DIP Methodology Focus
 
-- Task: Object Recognition (faces) implemented as face verification.
-- Model: VGG-Face within DeepFace — produces embedding vectors for each detected face.
-- Decision rule: Euclidean distance between embeddings; matches if distance < threshold.
-- Implementation: face analysis uses DeepFace APIs (e.g., `DeepFace.find()` / `DeepFace.verify()`).
+- Task: Object recognition (faces) implemented as face verification.  
+- Model: VGG‑Face embeddings (via DeepFace). See VGG‑Face paper: https://www.robots.ox.ac.uk/~vgg/publications/2015/parkhi15/  
+- Decision rule: Euclidean distance between embeddings; match if distance < threshold.  
+- Implementation: DeepFace APIs (e.g., `DeepFace.find()` / `DeepFace.verify()`).
 
 ## Project Structure
 
@@ -72,9 +73,11 @@ Face_Folio/
 ## Installation
 
 ### End Users
+
 Download and run the built installer: `FaceFolio-Setup-v1.0.exe`. No Python required. The DeepFace model will download on first run.
 
 ### Developers
+
 Clone and run from source:
 
 ```powershell
@@ -88,51 +91,62 @@ pip install -r requirements.txt
 python main.py
 ```
 
-Note: DeepFace/TensorFlow may require a specific Python version (e.g., 3.11) for best stability.
+Notes:
+- Python: https://www.python.org/ (use recommended version, e.g., 3.11 for TensorFlow compatibility).  
+- DeepFace repo & docs: https://github.com/serengil/deepface
 
 ## Building & Distribution
 
-Step 1 — Build main app bundle:
+This is a 2-step process. Run these commands from the project root after activating your `venv`. See [PyInstaller docs](https://pyinstaller.org/) for details.
+
+### Step 1 — Build main app bundle
+
+This command packages the Python application and its dependencies into a single folder.
 
 ```powershell
 # From project root with venv activated
 pyinstaller --noconsole --onedir --name FaceFolio --paths "src" --add-data "assets;assets" --hidden-import "tkinter" --hidden-import "tensorflow-cpu" --hidden-import "cv2" --hidden-import "deepface" --collect-all "customtkinter" --collect-all "numpy" --collect-all "PIL" --icon "assets/app_logo.ico" main.py
-or
-pyinstaller FaceFolio.spec
-# Output: dist/FaceFolio/FaceFolio.exe
 ```
 
-Step 2 — Build the complete setup:
+Alternatively, use the provided spec file:
 
 ```powershell
-# Ensure dist/FaceFolio exists
-pyinstaller --noconsole --onefile --name FaceFolio-Setup-v1.0 --add-data "dist/FaceFolio;FaceFolio" --add-data "installer/uninstaller_ui.py;." --hidden-import "win32com.client" --hidden-import "win32com.shell" --hidden-import "pywintypes" --hidden-import "winreg" --hidden-import "shutil" --collect-all "customtkinter" --icon "assets/app_logo.ico" installer/installer_ui.py --uac-admin
-or
-pyinstaller installer/FaceFolio_Complete_Setup.spec
-# Output: installer/dist/FaceFolio-Setup-v1.0.exe
+pyinstaller FaceFolio.spec
 ```
+
+Output: `dist/FaceFolio` folder.
+
+### Step 2 — Build the complete setup installer
+
+This command packages the app bundle from Step 1 into a single-file setup wizard (`.exe`). You must run Step 1 first so `dist/FaceFolio` exists.
+
+```powershell
+pyinstaller --noconsole --onefile --name FaceFolio-Setup-v1.0 --add-data "dist/FaceFolio;FaceFolio" --add-data "installer/uninstaller_ui.py;." --hidden-import "win32com.client" --hidden-import "win32com.shell" --hidden-import "pywintypes" --hidden-import "winreg" --hidden-import "shutil" --collect-all "customtkinter" --icon "assets/app_logo.ico" installer/installer_ui.py --uac-admin
+```
+
+Output: `dist/FaceFolio-Setup-v1.0.exe`.
 
 ## Team
 
 Primary Developer: Jampani Komal
 
 Roles (example):
-- DIP / Model Specialist — DeepFace integration, comparison logic
-- Application & Integration Engineer — GUI, installer scripts, packaging
+- DIP / Model Specialist — DeepFace integration, comparison logic  
+- Application & Integration Engineer — GUI, installer scripts, packaging  
 - Documentation & Testing Lead — Project report and validation
 
 Academic Year: 2024–2025
 
 ## Technologies
 
-- Python
-- DeepFace / TensorFlow / VGG-Face
-- CustomTkinter (GUI)
-- PyInstaller (packaging)
+- [Python](https://www.python.org/)  
+- [DeepFace](https://github.com/serengil/deepface) / [TensorFlow](https://www.tensorflow.org/) / VGG‑Face  
+- [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter) (GUI)  
+- [PyInstaller](https://pyinstaller.org/) (packaging)
 
 ## Acknowledgments
 
-- DeepFace contributors
-- CustomTkinter developers
+- DeepFace contributors — https://github.com/serengil/deepface  
+- CustomTkinter developers — https://github.com/TomSchimansky/CustomTkinter
 
-<!-- end -->
+<!-- end list -->
