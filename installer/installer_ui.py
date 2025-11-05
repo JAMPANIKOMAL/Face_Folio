@@ -200,7 +200,7 @@ class InstallerApp(ctk.CTk):
         desc_text = (
             "This wizard will guide you through the installation of\n"
             f"{self.APP_NAME}, a Photo Organizer for event photos.\n\n"
-            "Face Folio uses modern DeepFace models for Object Recognition\n"
+            "Face Folio uses the face_recognition library (dlib-based)\n"
             "to automatically sort images by person.\n\n"
             "Click Next to continue."
         )
@@ -332,7 +332,7 @@ class InstallerApp(ctk.CTk):
 
         model_note = ctk.CTkLabel(
             page,
-            text="Note: The high-accuracy DeepFace model (580MB) will download on first run.",
+            text="Note: Face recognition models will be initialized on first run.",
             font=ctk.CTkFont(size=11, slant="italic"),
             text_color=self.current_theme["DISABLED_COLOR"]
         )
