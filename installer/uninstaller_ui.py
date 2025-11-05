@@ -62,6 +62,8 @@ class UninstallerApp(ctk.CTk):
         self.APP_NAME = "Face Folio"
         self.APP_VERSION = "v1.0"
         self.install_location = None
+        
+        # Try multiple methods to find install location
         self.install_info_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "install_info.json")
         
         self.title(f"{self.APP_NAME} - Uninstall")
@@ -76,14 +78,31 @@ class UninstallerApp(ctk.CTk):
         self.create_ui()
 
     def load_install_info(self):
-        """Load installation metadata from install_info.json file."""
+        """Load installation metadata from install_info.json file or registry."""
+        # Method 1: Try to load from install_info.json
         if os.path.exists(self.install_info_path):
             try:
                 with open(self.install_info_path, 'r') as f:
                     info = json.load(f)
                     self.install_location = info.get("install_location")
+                    if self.install_location:
+                        return
             except Exception as e:
                 print(f"Error reading install info: {e}")
+        
+        # Method 2: Try to get from Windows Registry
+        if winreg:
+            try:
+                key_path = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\FaceFolio"
+                key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_READ)
+                self.install_location, _ = winreg.QueryValueEx(key, "InstallLocation")
+                winreg.CloseKey(key)
+            except Exception as e:
+                print(f"Error reading registry: {e}")
+        
+        # Method 3: Use the directory where Uninstall.exe is located
+        if not self.install_location:
+            self.install_location = os.path.dirname(os.path.abspath(__file__))
 
     def create_ui(self):
         """Build the uninstaller user interface."""
