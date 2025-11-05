@@ -299,7 +299,7 @@ class InstallerApp(ctk.CTk):
         opts_frame.pack(pady=10, padx=60, fill="x")
         
         # --- Using the fix from our previous conversation ---
-        self.create_desktop_shortcut = tk.BooleanVar(value=False)
+        self.create_desktop_shortcut = tk.BooleanVar(value=True)
         desktop_cb = ctk.CTkCheckBox(
             opts_frame,
             text="Create a desktop shortcut",
@@ -315,7 +315,7 @@ class InstallerApp(ctk.CTk):
         desktop_cb.pack(pady=10, anchor="w")
         
         # --- Using the fix from our previous conversation ---
-        self.create_startmenu_shortcut = tk.BooleanVar(value=False)
+        self.create_startmenu_shortcut = tk.BooleanVar(value=True)
         startmenu_cb = ctk.CTkCheckBox(
             opts_frame,
             text="Create a Start Menu folder",

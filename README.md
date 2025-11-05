@@ -128,7 +128,7 @@ This command packages the Python application and its dependencies into a single 
 
 ```powershell
 # From project root with venv activated
-pyinstaller --noconsole --onedir --name FaceFolio --paths "src" --add-data "assets;assets" --hidden-import "tkinter" --hidden-import "face_recognition" --hidden-import "dlib" --hidden-import "skimage" --collect-all "customtkinter" --collect-all "numpy" --collect-all "PIL" --icon "assets/app_logo.ico" main.py
+pyinstaller --noconsole --onedir --name FaceFolio --paths "src" --add-data "assets;assets" --hidden-import "tkinter" --hidden-import "face_recognition" --hidden-import "dlib" --collect-all "customtkinter" --collect-all "numpy" --collect-all "PIL" --collect-all "face_recognition_models" --icon "assets/app_logo.ico" main.py
 ```
 
 Output: `dist/FaceFolio` folder.
@@ -138,7 +138,7 @@ Output: `dist/FaceFolio` folder.
 This command packages the app bundle from Step 1 into a single-file setup wizard (`.exe`). You must run Step 1 first so `dist/FaceFolio` exists.
 
 ```powershell
-pyinstaller --noconsole --onefile --name FaceFolio-Setup-v1.0 --add-data "dist/FaceFolio;FaceFolio" --add-data "installer/uninstaller_ui.py;." --hidden-import "win32com.client" --hidden-import "win32com.shell" --hidden-import "pywintypes" --hidden-import "winreg" --hidden-import "shutil" --collect-all "customtkinter" --icon "assets/app_logo.ico" installer/installer_ui.py --uac-admin
+pyinstaller --noconsole --onefile --name FaceFolio-Setup-v1.0 --icon assets/app_logo.ico --add-data "dist/FaceFolio;FaceFolio" --add-data "assets/app_logo.ico;." installer/installer_ui.py
 ```
 
 Output: `dist/FaceFolio-Setup-v1.0.exe`.
