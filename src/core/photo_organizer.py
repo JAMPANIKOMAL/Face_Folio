@@ -1,19 +1,233 @@
 #!/usr/bin/env python3
 """
-Face Folio - Core DIP Logic
-Uses DeepFace to find and sort photos.
+Face Folio - Core Logic
+(Restored from v1.0 prototype)
 """
 
 import os
 import shutil
-import pandas as pd
-from deepface import DeepFace
-from pathlib import Path
 import zipfile
 import tempfile
+from pathlib import Path
+import face_recognition
 
 # Define the image extensions we want to process
 VALID_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.bmp')
+
+# ---
+# --- FEATURE 1: REFERENCE-BASED SORTING ---
+# --- (Restored from old core.py) ---
+# ---
+
+def _load_reference_encodings(image_paths, progress_callback):
+    """
+    Helper function to load encodings from a list of reference image paths.
+    The name is derived from the image's filename (e.g., "Alice.jpg" -> "Alice")
+    """
+    known_face_encodings = []
+    known_face_names = []
+    total = len(image_paths)
+
+    for i, image_path in enumerate(image_paths):
+        filename = os.path.basename(image_path)
+        name = os.path.splitext(filename)[0]
+        
+        if progress_callback:
+            progress_callback(f"Learning face: {name} ({i+1}/{total})", 0.3 + (0.3 * (i / total)))
+        
+        try:
+            image = face_recognition.load_image_file(image_path)
+            encodings = face_recognition.face_encodings(image)
+            
+            if encodings:
+                known_face_encodings.append(encodings[0])
+                known_face_names.append(name)
+            else:
+                print(f"Warning: No face found in reference image {filename}")
+        except Exception as e:
+            print(f"Error loading reference {filename}: {e}")
+            
+    return known_face_names, known_face_encodings
+
+def run_reference_sort(ref_input_path, event_input_path, output_folder, update_status_callback):
+    """
+    Main function for sorting photos based on a reference input.
+    """
+    temp_dirs_to_clean = []
+    
+    try:
+        # 1. Process Reference Input (Folder/File/ZIP)
+        update_status_callback("Step 1/3: Loading reference images...", 0.1)
+        ref_image_paths, ref_temp_dir = find_images(ref_input_path)
+        if ref_temp_dir:
+            temp_dirs_to_clean.append(ref_temp_dir)
+        
+        if not ref_image_paths:
+            raise Exception("No valid reference images found.")
+
+        # 2. Process Event Input (Folder/File/ZIP)
+        update_status_callback("Step 2/3: Finding all event photos...", 0.2)
+        event_image_paths, event_temp_dir = find_images(event_input_path)
+        if event_temp_dir:
+            temp_dirs_to_clean.append(event_temp_dir)
+        
+        if not event_image_paths:
+            raise Exception("No valid event images found.")
+
+        # 3. Load known faces
+        update_status_callback("Step 3/3: Learning reference faces...", 0.3)
+        known_names, known_encodings = _load_reference_encodings(ref_image_paths, update_status_callback)
+
+        if not known_encodings:
+            raise Exception("No faces could be learned from the reference images.")
+            
+        update_status_callback(f"Step 3/3: Analyzing {len(event_image_paths)} event photos...", 0.6)
+
+        # 4. Create output folders
+        unknown_folder = os.path.join(output_folder, "_NoMatches")
+        os.makedirs(unknown_folder, exist_ok=True)
+        person_folders = {}
+        for name in known_names:
+            folder_path = os.path.join(output_folder, name)
+            os.makedirs(folder_path, exist_ok=True)
+            person_folders[name] = folder_path
+
+        # 5. Loop through event photos and sort
+        total = len(event_image_paths)
+        for i, image_path in enumerate(event_image_paths):
+            filename = os.path.basename(image_path)
+            progress = 0.6 + (0.4 * (i / total))
+            update_status_callback(f"Analyzing {filename} ({i+1}/{total})", progress)
+            
+            try:
+                unknown_image = face_recognition.load_image_file(image_path)
+                unknown_encodings = face_recognition.face_encodings(unknown_image)
+                
+                found_in_photo = set()
+                
+                for encoding in unknown_encodings:
+                    matches = face_recognition.compare_faces(known_encodings, encoding)
+                    if True in matches:
+                        first_match_index = matches.index(True)
+                        name = known_names[first_match_index]
+                        found_in_photo.add(name)
+                
+                if found_in_photo:
+                    for name in found_in_photo:
+                        dest_path = os.path.join(person_folders[name], filename)
+                        if not os.path.exists(dest_path):
+                            shutil.copy(image_path, dest_path)
+                else:
+                    dest_path = os.path.join(unknown_folder, filename)
+                    if not os.path.exists(dest_path):
+                        shutil.copy(image_path, dest_path)
+                        
+            except Exception as e:
+                print(f"Error processing {filename}: {e}")
+                try:
+                    dest_path = os.path.join(unknown_folder, filename)
+                    if not os.path.exists(dest_path):
+                        shutil.copy(image_path, dest_path)
+                except Exception:
+                    pass # Failsafe
+
+    finally:
+        # 6. Cleanup
+        for d in temp_dirs_to_clean:
+            print(f"Cleaning up temporary directory: {d}")
+            shutil.rmtree(d, ignore_errors=True)
+
+
+# ---
+# --- FEATURE 2: AUTOMATIC DISCOVERY ---
+# --- (Restored from old core.py) ---
+# ---
+
+def _save_portrait(image, face_location, save_path):
+    """Crops and saves a portrait of a found face."""
+    top, right, bottom, left = face_location
+    # Add padding
+    top = max(0, top - 50)
+    left = max(0, left - 50)
+    bottom = min(image.shape[0], bottom + 50)
+    right = min(image.shape[1], right + 50)
+    
+    face_image = image[top:bottom, left:right]
+    
+    from PIL import Image
+    pil_image = Image.fromarray(face_image)
+    pil_image.save(save_path)
+
+def run_auto_discovery(event_input_path, output_folder, update_status_callback):
+    """
+    Finds all unique faces in an event, saves them for tagging,
+    and returns a list of paths for the UI.
+    """
+    temp_dirs_to_clean = []
+    
+    try:
+        update_status_callback("Step 1/2: Finding all event photos...", 0.1)
+        event_image_paths, event_temp_dir = find_images(event_input_path)
+        if event_temp_dir:
+            temp_dirs_to_clean.append(event_temp_dir)
+        
+        if not event_image_paths:
+            raise Exception("No valid event images found.")
+            
+        tagging_folder = os.path.join(output_folder, "_Portraits_To_Tag")
+        if os.path.exists(tagging_folder):
+            shutil.rmtree(tagging_folder)
+        os.makedirs(tagging_folder)
+
+        known_face_encodings = []
+        portrait_files = []
+        
+        total = len(event_image_paths)
+        update_status_callback(f"Step 2/2: Analyzing {total} photos for unique faces...", 0.3)
+        
+        for i, image_path in enumerate(event_image_paths):
+            filename = os.path.basename(image_path)
+            progress = 0.3 + (0.7 * (i / total))
+            update_status_callback(f"Analyzing {filename} ({i+1}/{total})", progress)
+
+            try:
+                image = face_recognition.load_image_file(image_path)
+                face_locations = face_recognition.face_locations(image)
+                face_encodings = face_recognition.face_encodings(image, face_locations)
+                
+                for j, (encoding, location) in enumerate(zip(face_encodings, face_locations)):
+                    if not known_face_encodings:
+                        # First face ever found
+                        portrait_path = os.path.join(tagging_folder, f"Person_{len(portrait_files)}.jpg")
+                        _save_portrait(image, location, portrait_path)
+                        known_face_encodings.append(encoding)
+                        portrait_files.append(portrait_path)
+                        continue
+
+                    matches = face_recognition.compare_faces(known_face_encodings, encoding)
+                    
+                    if True not in matches:
+                        # This is a new unique face
+                        portrait_path = os.path.join(tagging_folder, f"Person_{len(portrait_files)}.jpg")
+                        _save_portrait(image, location, portrait_path)
+                        known_face_encodings.append(encoding)
+                        portrait_files.append(portrait_path)
+                        
+            except Exception as e:
+                print(f"Error processing {filename}: {e}")
+    
+    finally:
+        for d in temp_dirs_to_clean:
+            print(f"Cleaning up temporary directory: {d}")
+            shutil.rmtree(d, ignore_errors=True)
+            
+    return portrait_files
+
+
+# ---
+# --- SHARED HELPER FUNCTION ---
+# --- (Kept from new photo_organizer.py) ---
+# ---
 
 def find_images(input_path):
     """
@@ -58,160 +272,3 @@ def find_images(input_path):
     
     print(f"Found {len(image_paths)} valid images.")
     return image_paths, temp_dir
-
-def run_face_analysis(ref_input_path, event_input_path, output_folder, update_status_callback):
-    """
-    The main analysis function. Uses DeepFace.find() to process all images.
-    """
-    
-    temp_dirs_to_clean = []
-    ref_db_path = str(ref_input_path)
-    
-    try:
-        # 1. Process Reference Input (Folder/File/ZIP)
-        ref_image_paths, ref_temp_dir = find_images(ref_input_path)
-        if ref_temp_dir: 
-            temp_dirs_to_clean.append(ref_temp_dir)
-            ref_db_path = ref_temp_dir
-        
-        # --- BUG FIX: Handle single image reference ---
-        # If input is a single file, create a temp DB for DeepFace
-        elif Path(ref_input_path).is_file() and Path(ref_input_path).suffix.lower() in VALID_EXTENSIONS:
-            ref_db_temp_dir = tempfile.mkdtemp()
-            temp_dirs_to_clean.append(ref_db_temp_dir)
-            
-            # Use file stem as the person's name
-            person_name = Path(ref_input_path).stem
-            person_folder = os.path.join(ref_db_temp_dir, person_name)
-            os.makedirs(person_folder)
-            
-            # Copy the image into the named folder
-            shutil.copy(ref_input_path, person_folder)
-            
-            ref_db_path = ref_db_temp_dir
-            print(f"Created temporary reference DB for single file at: {ref_db_path}")
-        # --- END BUG FIX ---
-        
-        elif not Path(ref_input_path).is_dir():
-             raise Exception("Reference input must be a valid folder, image file, or ZIP archive.")
-
-
-        # 2. Process Event Input (Folder/File/ZIP)
-        event_image_paths, event_temp_dir = find_images(event_input_path)
-        if event_temp_dir: temp_dirs_to_clean.append(event_temp_dir)
-
-        if not event_image_paths:
-            raise Exception("No valid images found in the Event Input.")
-
-        
-        # --- DeepFace Configuration and Initialization ---
-        update_status_callback("Step 1/2: Learning reference faces and preparing database...", 0.05)
-        
-        # Force DeepFace to build its representation file if it hasn't already.
-        # We use event_image_paths[0] just as a dummy query image.
-        try:
-            DeepFace.find(
-                img_path=event_image_paths[0], 
-                db_path=ref_db_path, 
-                model_name='VGG-Face',
-                # --- !! CRITICAL FIX !! ---
-                distance_metric='euclidean_l2',
-                enforce_detection=False,
-                silent=True 
-            )
-        except Exception as e:
-            # Ignore first attempt error, as it's just meant to initialize the DB
-            pass
-
-        update_status_callback(f"Step 1/2: Reference database ready. Starting photo analysis...", 0.2)
-        
-        total_images = len(event_image_paths)
-        photo_to_people_map = {}
-        
-        # --- Step 2: Loop through every event photo and match it ---
-        for i, image_path in enumerate(event_image_paths):
-            filename = os.path.basename(image_path)
-            progress = 0.2 + (0.6 * (i / total_images)) 
-            
-            update_status_callback(
-                f"Step 2/2: Analyzing {filename} ({i+1}/{total_images})...", 
-                progress
-            )
-            
-            try:
-                dfs = DeepFace.find(
-                    img_path=image_path,
-                    db_path=ref_db_path, # Use the path derived from the input
-                    model_name='VGG-Face',
-                    # --- !! CRITICAL FIX !! ---
-                    distance_metric='euclidean_l2',
-                    enforce_detection=False,
-                    silent=True
-                )
-                
-                found_names_in_this_photo = set()
-
-                for df in dfs:
-                    if not df.empty:
-                        # Get the identity path of the top match
-                        identity_path = Path(df['identity'].iloc[0])
-                        
-                        # FIX: Extract the person's name using the parent folder name
-                        # DeepFace uses the folder containing the image as the identity.
-                        name = identity_path.parent.name
-                        
-                        # This fix is now more robust due to the single-file-handler
-                        if name == Path(ref_db_path).name:
-                             name = identity_path.stem 
-                             
-                        found_names_in_this_photo.add(name)
-
-                if found_names_in_this_photo:
-                    print(f"Matched {list(found_names_in_this_photo)} in {filename}")
-                    photo_to_people_map[image_path] = list(found_names_in_this_photo)
-                else:
-                     photo_to_people_map[image_path] = [] 
-                     
-            except Exception as e:
-                print(f"Warning: Skipping {filename} due to processing error: {e}")
-                photo_to_people_map[image_path] = [] 
-
-        # --- Step 3: Sort the files based on the results (Move to new folders) ---
-        update_status_callback("Sorting files into output folders...", 0.9)
-        
-        unknown_folder = os.path.join(output_folder, "_NoMatches")
-        os.makedirs(unknown_folder, exist_ok=True)
-        
-        all_matched_photos = set()
-
-        # Copy photos for recognized people
-        for image_path, names in photo_to_people_map.items():
-            if names:
-                all_matched_photos.add(image_path)
-                for name in names:
-                    person_folder = os.path.join(output_folder, name)
-                    os.makedirs(person_folder, exist_ok=True)
-                    
-                    filename = os.path.basename(image_path)
-                    destination_path = os.path.join(person_folder, filename)
-                    
-                    if not os.path.exists(destination_path):
-                        # Use shutil.copy for robustness against permissions
-                        shutil.copy(image_path, destination_path)
-                        
-        # Copy photos with no matches (only photos from the event input that weren't matched)
-        for image_path in event_image_paths:
-            if image_path not in all_matched_photos:
-                filename = os.path.basename(image_path)
-                destination_path = os.path.join(unknown_folder, filename)
-                if not os.path.exists(destination_path):
-                    shutil.copy(image_path, destination_path)
-
-        print("Sorting complete.")
-
-    finally:
-        # --- BUG FIX: Cleanup ---
-        # Move cleanup to finally block to ensure it runs even if analysis fails
-        for d in temp_dirs_to_clean:
-            print(f"Cleaning up temporary directory: {d}")
-            shutil.rmtree(d, ignore_errors=True)
