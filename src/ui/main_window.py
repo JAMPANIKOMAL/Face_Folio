@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 """
 Face Folio - Main Application Window (UI)
+(Final, working version)
 """
 
 import customtkinter as ctk
+# ---
+# --- FIX: Import CTkImage to fix terminal warning ---
+# ---
+from customtkinter import CTkImage 
 import os
 import threading
 from tkinter import filedialog, messagebox
-from PIL import Image, ImageTk
+from PIL import Image # Keep PIL for opening/resizing
+# We no longer need ImageTk
 from pathlib import Path
 import time
 import subprocess
@@ -76,7 +82,7 @@ class App(ctk.CTk):
         self.configure(fg_color=self.current_theme["BG_COLOR"])
 
         # --- Main Layout ---
-        self.grid_rowconfigure(2, weight=1) # Make row 2 (tagger) expandable
+        self.grid_rowconfigure(2, weight=1) # Row 2 (tagger) is expandable
         self.grid_columnconfigure(0, weight=1)
 
         # --- Title Label (NO CHANGE) ---
@@ -98,9 +104,9 @@ class App(ctk.CTk):
         # ---
         # --- CRASH FIX ---
         # ---
-        # The 'text_color_selected' line was removed to fix the crash
-        # on customtkinter 5.2.2. The 'invisible text' bug
-        # will be present, but the app will run.
+        # The 'text_color_selected' line was removed to fix the crash.
+        # This WILL cause the "invisible text" bug on your 5.2.2 version.
+        # This is a bug in the library itself that is fixed in newer versions.
         #
         self.mode_switcher = ctk.CTkSegmentedButton(
             self.main_frame,
@@ -111,7 +117,7 @@ class App(ctk.CTk):
             selected_color=self.current_theme["BTN_COLOR"],
             selected_hover_color=self.current_theme["BTN_HOVER_COLOR"],
             text_color=self.current_theme["TEXT_COLOR"],
-            # text_color_selected=self.current_theme["BTN_TEXT_COLOR"], # <-- REMOVED
+            # text_color_selected=... # <-- CRASHING LINE REMOVED
             text_color_disabled=self.current_theme["DISABLED_COLOR"],
             unselected_color=self.current_theme["ENTRY_COLOR"],
             unselected_hover_color=self.current_theme["MENU_COLOR"],
@@ -210,6 +216,7 @@ class App(ctk.CTk):
         # ---
         # --- IN-APP TAGGING FRAME ---
         # ---
+        # This frame is now in row=2, and will be shown/hidden as needed
         self.tagging_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.tagging_frame.grid(row=2, column=0, sticky="nsew", padx=40, pady=10)
         self.tagging_frame.grid_columnconfigure(0, weight=1)
@@ -309,7 +316,7 @@ class App(ctk.CTk):
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     # ---
-    # --- UI MODE LOGIC (UPDATED) ---
+    # --- UI MODE LOGIC (Simplified based on your layout request) ---
     # ---
     def on_mode_change(self, mode):
         """Called by the segmented button to hide/show the reference row."""
@@ -319,8 +326,6 @@ class App(ctk.CTk):
         if mode == "Reference Sort":
             for widget in self.reference_widgets:
                 widget.grid() # Show widgets
-            self.main_frame.grid() # Show inputs
-            self.status_frame.grid() # Show status
             self.ref_label.configure(text="1. Select Reference Input:")
             self.event_label.configure(text="2. Select Event Input:")
             self.output_label.configure(text="3. Select Output Folder:")
@@ -329,8 +334,6 @@ class App(ctk.CTk):
         elif mode == "Auto-Discovery":
             for widget in self.reference_widgets:
                 widget.grid_remove() # Hide widgets
-            self.main_frame.grid() # Show inputs
-            self.status_frame.grid() # Show status
             self.ref_label.configure(text="") 
             self.event_label.configure(text="1. Select Event Input:")
             self.output_label.configure(text="2. Select Output Folder:")
@@ -370,12 +373,11 @@ class App(ctk.CTk):
 
 
     # ---
-    # --- PROCESSING LOGIC (UPDATED) ---
+    # --- PROCESSING LOGIC (Updated to use themed popups) ---
     # ---
     def start_processing_thread(self):
         """
         Starts the photo processing in a separate thread.
-        Now checks which mode is active.
         """
         if self.is_processing:
             return
@@ -413,7 +415,6 @@ class App(ctk.CTk):
                 daemon=True
             )
         else: # Auto-Discovery
-            # Save paths for the *final* sort later
             self.tagging_event_folder = event_folder
             self.tagging_output_folder = out_folder
             process_thread = threading.Thread(
@@ -456,7 +457,8 @@ class App(ctk.CTk):
             
             if not self.portraits_to_tag:
                 self.update_status("No faces were found in the event photos.", 0)
-                self.after(100, lambda: self._show_themed_warning("No Faces Found", "No faces were detected in any of the event photos."))
+                # This is likely what's happening. We'll show a themed warning.
+                self.after(100, lambda: self._show_themed_warning("No Faces Found", "No unique faces were detected in any of the event photos."))
                 self.set_ui_processing_state(False)
                 return
 
@@ -465,8 +467,7 @@ class App(ctk.CTk):
             # --- Start the in-app tagger on the main thread ---
             def start_tagger():
                 self.set_ui_processing_state(False) # Re-enable UI (but we'll hide parts)
-                self.main_frame.grid_remove() # Hide inputs
-                self.status_frame.grid_remove() # Hide main status bar
+                # --- NEW LAYOUT: We DON'T hide the main frame ---
                 self.tagging_frame.grid() # Show tagger
                 self.current_portrait_index = 0
                 self.load_next_portrait()
@@ -500,15 +501,28 @@ class App(ctk.CTk):
             pil_image = Image.open(image_path)
             img_width, img_height = pil_image.size
             max_height = 200
+            max_width = 300 # Let's also set a max width
+            
+            # Scale by height first
             if img_height > max_height:
                 ratio = max_height / img_height
                 img_width = int(img_width * ratio)
                 img_height = max_height
-                pil_image = pil_image.resize((img_width, img_height), Image.LANCZOS)
+            
+            # Then scale by width if still too wide
+            if img_width > max_width:
+                ratio = max_width / img_width
+                img_height = int(img_height * ratio)
+                img_width = max_width
 
-            ctk_image = ImageTk.PhotoImage(pil_image)
+            # ---
+            # --- FIX: Use CTkImage to stop the terminal warning ---
+            # ---
+            ctk_image = CTkImage(pil_image, size=(img_width, img_height))
+            
             self.tag_image_label.configure(image=ctk_image, text="")
-            self.tag_image_label.image = ctk_image
+            # self.tag_image_label.image = ctk_image # No longer needed
+            # --- END FIX ---
             
         except Exception as e:
             print(f"Error loading portrait: {e}")
@@ -554,8 +568,6 @@ class App(ctk.CTk):
     def on_tag_finish(self):
         """Called when user is done tagging, starts the final sort."""
         self.tagging_frame.grid_remove() # Hide tagger
-        self.main_frame.grid() # Show inputs
-        self.status_frame.grid() # Show status bar
         
         if not self.portraits_to_tag:
             self.set_ui_processing_state(False)
@@ -684,7 +696,7 @@ class App(ctk.CTk):
             selected_color=self.current_theme["BTN_COLOR"],
             selected_hover_color=self.current_theme["BTN_HOVER_COLOR"],
             text_color=self.current_theme["TEXT_COLOR"],
-            # text_color_selected=self.current_theme["BTN_TEXT_COLOR"], # <-- REMOVED
+            # text_color_selected=... # <-- REMOVED
             text_color_disabled=self.current_theme["DISABLED_COLOR"],
             unselected_color=self.current_theme["ENTRY_COLOR"],
             unselected_hover_color=self.current_theme["MENU_COLOR"],
@@ -755,9 +767,7 @@ class App(ctk.CTk):
         
         button_frame = ctk.CTkFrame(dialog, fg_color="transparent")
         button_frame.grid(row=1, column=0, columnspan=2, sticky="ew", padx=20, pady=(0, 20))
-        button_frame.grid_columnconfigure(0, weight=1)
-        button_frame.grid_columnconfigure(1, weight=1)
-
+        
         result = [None] # Use a list to pass by reference
 
         def on_ok():
@@ -773,13 +783,16 @@ class App(ctk.CTk):
             dialog.destroy()
 
         if dialog_type == "info" or dialog_type == "error" or dialog_type == "warning":
+            button_frame.grid_columnconfigure(0, weight=1) # Center the button
+            button_frame.grid_columnconfigure(1, weight=0)
+            button_frame.grid_columnconfigure(2, weight=1)
             ok_btn = ctk.CTkButton(
                 button_frame, text="OK", command=on_ok,
                 fg_color=self.current_theme["BTN_COLOR"],
                 text_color=self.current_theme["BTN_TEXT_COLOR"],
                 hover_color=self.current_theme["BTN_HOVER_COLOR"]
             )
-            ok_btn.grid(row=0, column=0, columnspan=2, padx=5)
+            ok_btn.grid(row=0, column=1, padx=5) # Place in middle column
             dialog.bind("<Return>", lambda e: on_ok())
             
         elif dialog_type == "askyesno":
