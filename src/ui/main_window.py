@@ -149,7 +149,7 @@ class App(ctk.CTk):
             font=ctk.CTkFont(size=14, weight="bold"),
             selected_color=self.current_theme["BTN_COLOR"],
             selected_hover_color=self.current_theme["BTN_HOVER_COLOR"],
-            text_color=self.current_theme["TEXT_COLOR"],
+            text_color=self.current_theme["BTN_TEXT_COLOR"],
             text_color_disabled=self.current_theme["DISABLED_COLOR"],
             unselected_color=self.current_theme["ENTRY_COLOR"],
             unselected_hover_color=self.current_theme["MENU_COLOR"],
@@ -774,7 +774,7 @@ class App(ctk.CTk):
         self.mode_switcher.configure(
             selected_color=self.current_theme["BTN_COLOR"],
             selected_hover_color=self.current_theme["BTN_HOVER_COLOR"],
-            text_color=self.current_theme["TEXT_COLOR"],
+            text_color=self.current_theme["BTN_TEXT_COLOR"],
             text_color_disabled=self.current_theme["DISABLED_COLOR"],
             unselected_color=self.current_theme["ENTRY_COLOR"],
             unselected_hover_color=self.current_theme["MENU_COLOR"],
