@@ -113,7 +113,9 @@ def run_face_analysis(ref_input_path, event_input_path, output_folder, update_st
             DeepFace.find(
                 img_path=event_image_paths[0], 
                 db_path=ref_db_path, 
-                model_name='VGG-Face', 
+                model_name='VGG-Face',
+                # --- !! CRITICAL FIX !! ---
+                distance_metric='euclidean_l2',
                 enforce_detection=False,
                 silent=True 
             )
@@ -141,6 +143,8 @@ def run_face_analysis(ref_input_path, event_input_path, output_folder, update_st
                     img_path=image_path,
                     db_path=ref_db_path, # Use the path derived from the input
                     model_name='VGG-Face',
+                    # --- !! CRITICAL FIX !! ---
+                    distance_metric='euclidean_l2',
                     enforce_detection=False,
                     silent=True
                 )

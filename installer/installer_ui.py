@@ -67,10 +67,20 @@ class InstallerApp(ctk.CTk):
         self.resizable(False, False)
         
         try:
-            icon_path = os.path.join(self.source_folder, "assets", "app_logo.ico")
+            # --- FIX 1: Corrected icon path ---
+            # The --icon flag bundles it at the root of _MEIPASS
+            icon_path = os.path.join(self.source_folder, "app_logo.ico")
+            
+            # Dev fallback: check original assets folder if not bundled
+            if not os.path.exists(icon_path):
+                 icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "app_logo.ico")
+
             if os.path.exists(icon_path):
                 self.iconbitmap(icon_path)
                 self.after(100, lambda: self.iconbitmap(icon_path))
+            else:
+                 print(f"Icon not found at {icon_path}")
+                    
         except Exception as e:
             print(f"Could not load icon: {e}")
         
@@ -88,6 +98,7 @@ class InstallerApp(ctk.CTk):
         if hasattr(sys, '_MEIPASS'):
             return sys._MEIPASS
         else:
+            # Dev path: 'Face_Folio/installer/' -> 'Face_Folio/'
             return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
     def create_pages(self):
@@ -266,7 +277,7 @@ class InstallerApp(ctk.CTk):
         opts_frame = ctk.CTkFrame(page, fg_color="transparent")
         opts_frame.pack(pady=10, padx=60, fill="x")
         
-        # --- FIX 1: Changed value=True to value=False ---
+        # --- Using the fix from our previous conversation ---
         self.create_desktop_shortcut = tk.BooleanVar(value=False)
         desktop_cb = ctk.CTkCheckBox(
             opts_frame,
@@ -282,7 +293,7 @@ class InstallerApp(ctk.CTk):
         )
         desktop_cb.pack(pady=10, anchor="w")
         
-        # --- FIX 1: Changed value=True to value=False ---
+        # --- Using the fix from our previous conversation ---
         self.create_startmenu_shortcut = tk.BooleanVar(value=False)
         startmenu_cb = ctk.CTkCheckBox(
             opts_frame,
@@ -331,6 +342,7 @@ class InstallerApp(ctk.CTk):
             border_color=self.current_theme["BORDER_COLOR"]
         )
         self.progress_bar.set(0)
+        # --- Using the fix from our previous conversation (not packed) ---
         
         self.status_label = ctk.CTkLabel(
             page,
@@ -338,7 +350,7 @@ class InstallerApp(ctk.CTk):
             font=ctk.CTkFont(size=13),
             text_color=self.current_theme["TEXT_COLOR"]
         )
-        self.status_label.pack(pady=80, padx=40)
+        self.status_label.pack(pady=80, padx=40) 
         
         self.details_label = ctk.CTkLabel(
             page,
@@ -403,9 +415,9 @@ class InstallerApp(ctk.CTk):
         
         self.update_navigation_buttons()
 
+        # --- Using the fix from our previous conversation ---
         if self.current_page == len(self.pages) - 2:
-            self.progress_bar.pack(pady=20, padx=40)
-            self.status_label.pack_configure(pady=10)
+            self.status_label.pack_configure(pady=80) 
         else:
             self.progress_bar.pack_forget()
             self.status_label.pack_configure(pady=80)
@@ -496,6 +508,10 @@ class InstallerApp(ctk.CTk):
         self.is_installing = True
         self.update_navigation_buttons()
         
+        # --- Using the fix from our previous conversation ---
+        self.progress_bar.pack(pady=20, padx=40)
+        self.status_label.pack_configure(pady=10) 
+        
         install_thread = threading.Thread(target=self.install_files, daemon=True)
         install_thread.start()
     
@@ -508,11 +524,7 @@ class InstallerApp(ctk.CTk):
             # Step 1: Create installation directory
             self.update_progress(current_step / total_steps, "Creating installation directory...", "")
             try:
-                # --- BUG FIX ---
-                # Replaced shutil.rmtree with os.makedirs(exist_ok=True)
-                # This prevents the high-severity data loss bug.
                 os.makedirs(self.install_location, exist_ok=True)
-                # --- END BUG FIX ---
             except PermissionError as e:
                 raise Exception(f"Permission denied. Please choose a different installation location.")
             except Exception as e:
@@ -520,36 +532,31 @@ class InstallerApp(ctk.CTk):
             current_step += 1
             
             # ------------------------------------------------------------------
-            # START OF ONEDIR RESTORATION AND DEFENSIVE COPY LOOP (Final Attempt)
             # Step 2: Copy application bundle (Copying the extracted folder)
             self.update_progress(current_step / total_steps, "Copying application files (Folder copy)...", "Waiting for system file lock release...")
 
             app_bundle_src = os.path.join(self.source_folder, "FaceFolio")
 
             if not os.path.exists(app_bundle_src):
-                # This check ensures the 'FaceFolio' folder (built with --onedir) exists in the temp location
                 raise Exception(f"Application bundle folder not found inside installer package. Please ensure Step 1 created the 'dist/FaceFolio' folder.")
 
             # --- DEFENSIVE COPY LOOP FOR SHUTIL.COPYTREE ---
             copied_successfully = False
             for attempt in range(10): # Try up to 10 times
                 try:
-                    # Copy the entire directory tree from the temp location to the install location
                     shutil.copytree(app_bundle_src, self.install_location, dirs_exist_ok=True)
                     copied_successfully = True
                     break
                 except PermissionError:
                     self.update_progress(current_step / total_steps, f"Directory Locked (Attempt {attempt+1}/10). Retrying...", "Security scan is in progress.")
-                    time.sleep(1) # Wait 1 second before retrying
+                    time.sleep(1) 
                 except Exception as e:
-                    # Catch any other unexpected error
                     raise Exception(f"Copy failed on attempt {attempt+1}: {e}")
 
             if not copied_successfully:
                 raise Exception("Failed to copy FaceFolio application folder after 10 attempts. Files remain locked.")
 
             current_step += 1
-            # END OF ONEDIR RESTORATION
             # ------------------------------------------------------------------
             
             # Step 3: Create uninstaller script 
@@ -631,18 +638,24 @@ class InstallerApp(ctk.CTk):
                     uninstall_shortcut.WorkingDirectory = self.install_location
                     uninstall_shortcut.save()
         
-        # --- FIX 2: Replaced popup error with console warning ---
+        # --- Using the fix from our previous conversation ---
         except Exception as e:
-            # Don't show a popup for a non-critical error.
-            # The user can create shortcuts manually if they really want them.
             print(f"Warning: Could not create shortcuts: {e}. Installation will continue.")
 
     
     def create_uninstaller(self):
         """Creates a dedicated uninstaller script and a small Python launcher."""
-        uninstaller_ui_src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uninstaller_ui.py")
+        # --- FIX 1c: Use the correct source_folder path ---
+        uninstaller_ui_src = os.path.join(self.source_folder, "uninstaller_ui.py")
+        
+        # Dev fallback
+        if not os.path.exists(uninstaller_ui_src):
+            uninstaller_ui_src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uninstaller_ui.py")
+            
         if os.path.exists(uninstaller_ui_src):
             shutil.copy2(uninstaller_ui_src, self.install_location)
+        else:
+            print(f"Warning: uninstaller_ui.py not found at {uninstaller_ui_src}")
 
         uninstaller_launcher_path = os.path.join(self.install_location, "uninstall_launcher.py")
         with open(uninstaller_launcher_path, 'w') as f:
