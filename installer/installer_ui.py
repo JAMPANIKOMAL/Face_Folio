@@ -266,7 +266,8 @@ class InstallerApp(ctk.CTk):
         opts_frame = ctk.CTkFrame(page, fg_color="transparent")
         opts_frame.pack(pady=10, padx=60, fill="x")
         
-        self.create_desktop_shortcut = tk.BooleanVar(value=True)
+        # --- FIX 1: Changed value=True to value=False ---
+        self.create_desktop_shortcut = tk.BooleanVar(value=False)
         desktop_cb = ctk.CTkCheckBox(
             opts_frame,
             text="Create a desktop shortcut",
@@ -281,7 +282,8 @@ class InstallerApp(ctk.CTk):
         )
         desktop_cb.pack(pady=10, anchor="w")
         
-        self.create_startmenu_shortcut = tk.BooleanVar(value=True)
+        # --- FIX 1: Changed value=True to value=False ---
+        self.create_startmenu_shortcut = tk.BooleanVar(value=False)
         startmenu_cb = ctk.CTkCheckBox(
             opts_frame,
             text="Create a Start Menu folder",
@@ -629,9 +631,11 @@ class InstallerApp(ctk.CTk):
                     uninstall_shortcut.WorkingDirectory = self.install_location
                     uninstall_shortcut.save()
         
+        # --- FIX 2: Replaced popup error with console warning ---
         except Exception as e:
-            print(f"Error creating shortcuts: {e}")
-            self.after(0, lambda: self.show_error_dialog("Shortcut Error", "Could not create shortcuts. Please install manually."))
+            # Don't show a popup for a non-critical error.
+            # The user can create shortcuts manually if they really want them.
+            print(f"Warning: Could not create shortcuts: {e}. Installation will continue.")
 
     
     def create_uninstaller(self):
