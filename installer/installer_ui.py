@@ -267,7 +267,7 @@ class InstallerApp(ctk.CTk):
         
         space_info = ctk.CTkLabel(
             page,
-            text="Disk space required: ~550 MB (Model downloads on first run)",
+            text="Disk space required: ~80 MB",
             font=ctk.CTkFont(size=12),
             text_color=self.current_theme["DISABLED_COLOR"]
         )
