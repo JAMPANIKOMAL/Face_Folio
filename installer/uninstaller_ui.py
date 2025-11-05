@@ -70,6 +70,15 @@ class UninstallerApp(ctk.CTk):
         self.geometry("400x300")
         self.resizable(False, False)
         
+        # Set window icon
+        try:
+            icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "app_logo.ico")
+            if os.path.exists(icon_path):
+                self.iconbitmap(icon_path)
+                self.after(100, lambda: self.iconbitmap(icon_path))
+        except Exception as e:
+            print(f"Could not load icon: {e}")
+        
         ctk.set_appearance_mode("system")
         self.current_theme = DARK_THEME if ctk.get_appearance_mode() == "Dark" else LIGHT_THEME
         self.configure(fg_color=self.current_theme["BG_COLOR"])
