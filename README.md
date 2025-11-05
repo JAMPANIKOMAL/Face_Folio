@@ -120,7 +120,7 @@ Notes:
 
 ## Building & Distribution
 
-This is a 2-step process. Run these commands from the project root after activating your `venv`. See [PyInstaller docs](https://pyinstaller.org/) for details.
+This is a 3-step process. Run these commands from the project root after activating your `venv`. See [PyInstaller docs](https://pyinstaller.org/) for details.
 
 ### Step 1 — Build main app bundle
 
@@ -133,12 +133,22 @@ pyinstaller --noconsole --onedir --name FaceFolio --paths "src" --add-data "asse
 
 Output: `dist/FaceFolio` folder.
 
-### Step 2 — Build the complete setup installer
+### Step 2 — Build uninstaller
 
-This command packages the app bundle from Step 1 into a single-file setup wizard (`.exe`). You must run Step 1 first so `dist/FaceFolio` exists.
+This command creates a standalone uninstaller executable.
 
 ```powershell
-pyinstaller --noconsole --onefile --name FaceFolio-Setup-v1.0 --icon assets/app_logo.ico --add-data "dist/FaceFolio;FaceFolio" --add-data "assets/app_logo.ico;." installer/installer_ui.py
+pyinstaller --noconsole --onefile --name Uninstall --icon assets/app_logo.ico --collect-all customtkinter uninstall.py
+```
+
+Output: `dist/Uninstall.exe`.
+
+### Step 3 — Build the complete setup installer
+
+This command packages the app bundle and uninstaller into a single-file setup wizard (`.exe`). You must run Steps 1 & 2 first.
+
+```powershell
+pyinstaller --noconsole --onefile --name FaceFolio-Setup-v1.0 --icon assets/app_logo.ico --add-data "dist/FaceFolio;FaceFolio" --add-data "dist/Uninstall.exe;." --add-data "assets/app_logo.ico;." installer/installer_ui.py
 ```
 
 Output: `dist/FaceFolio-Setup-v1.0.exe`.

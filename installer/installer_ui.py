@@ -665,29 +665,19 @@ class InstallerApp(ctk.CTk):
 
     
     def create_uninstaller(self):
-        """Creates a dedicated uninstaller script and a small Python launcher."""
-        # --- FIX 1c: Use the correct source_folder path ---
-        uninstaller_ui_src = os.path.join(self.source_folder, "uninstaller_ui.py")
+        """Copies the Uninstall.exe to installation directory."""
+        # Copy Uninstall.exe from the bundled resources
+        uninstaller_src = os.path.join(self.source_folder, "Uninstall.exe")
         
         # Dev fallback
-        if not os.path.exists(uninstaller_ui_src):
-            uninstaller_ui_src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uninstaller_ui.py")
+        if not os.path.exists(uninstaller_src):
+            uninstaller_src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "dist", "Uninstall.exe")
             
-        if os.path.exists(uninstaller_ui_src):
-            shutil.copy2(uninstaller_ui_src, self.install_location)
+        if os.path.exists(uninstaller_src):
+            uninstaller_dest = os.path.join(self.install_location, "Uninstall.exe")
+            shutil.copy2(uninstaller_src, uninstaller_dest)
         else:
-            print(f"Warning: uninstaller_ui.py not found at {uninstaller_ui_src}")
-
-        uninstaller_launcher_path = os.path.join(self.install_location, "uninstall_launcher.py")
-        with open(uninstaller_launcher_path, 'w') as f:
-            f.write('#!/usr/bin/env python3\n')
-            f.write('import os\n')
-            f.write('import sys\n')
-            f.write('os.chdir(os.path.dirname(os.path.abspath(__file__)))\n')
-            f.write('if os.path.exists("uninstaller_ui.py"):\n')
-            f.write('    exec(open("uninstaller_ui.py").read())\n')
-            f.write('else:\n')
-            f.write('    print("Uninstaller UI not found.")\n')
+            print(f"Warning: Uninstall.exe not found at {uninstaller_src}")
 
     def register_installation(self):
         """Register installation in Windows Registry (Add/Remove Programs)"""
@@ -704,11 +694,9 @@ class InstallerApp(ctk.CTk):
             winreg.SetValueEx(key, "Publisher", 0, winreg.REG_SZ, "Jampani Komal")
             winreg.SetValueEx(key, "InstallLocation", 0, winreg.REG_SZ, self.install_location)
             
-            python_exe_path = os.path.join(self.install_location, "FaceFolio.exe")
-            uninstaller_launcher_path = os.path.join(self.install_location, "uninstall_launcher.py")
-            uninstall_command = f'"{python_exe_path}" "{uninstaller_launcher_path}"'
-
-            winreg.SetValueEx(key, "UninstallString", 0, winreg.REG_SZ, uninstall_command)
+            # Point to Uninstall.exe
+            uninstaller_path = os.path.join(self.install_location, "Uninstall.exe")
+            winreg.SetValueEx(key, "UninstallString", 0, winreg.REG_SZ, f'"{uninstaller_path}"')
             
             icon_path = os.path.join(self.install_location, "assets", "app_logo.ico")
             if os.path.exists(icon_path):
