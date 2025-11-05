@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-"""
-Face Folio - Custom Installer UI (Python-based)
-"""
 
 import customtkinter as ctk
 import tkinter as tk
@@ -23,7 +20,6 @@ except ImportError:
     print("Warning: win32com or winreg not found. Shortcuts/Registry will be skipped.")
 
 
-# --- THEME DEFINITIONS (Matching main app) ---
 DARK_THEME = {
     "BG_COLOR": "#000000",
     "MENU_COLOR": "#1C1C1C",
