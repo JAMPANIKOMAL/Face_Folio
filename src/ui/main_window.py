@@ -11,10 +11,15 @@ from PIL import Image
 from pathlib import Path
 import time
 
-# --- NEW IMPORTS ---
-# We now import our new, simpler functions
-from core.photo_organizer import find_images, run_face_analysis
-# --- END NEW IMPORTS ---
+# ---
+# --- FIX #1: UPDATED IMPORTS ---
+# ---
+# We now import the 'run_reference_sort' function from our restored
+# prototype logic (from src/core/photo_organizer.py, Step 2).
+# The old, broken 'run_face_analysis' function has been removed.
+#
+from core.photo_organizer import run_reference_sort
+# --- END UPDATED IMPORTS ---
 
 
 # --- THEME DEFINITIONS (Matching AI Corrector) ---
@@ -60,10 +65,9 @@ class App(ctk.CTk):
         self.event_folder = ctk.StringVar()
         self.output_folder = ctk.StringVar()
         self.is_processing = False
+        # --- FEATURE PRESERVED ---
+        # This extensions list is what enables the ZIP feature.
         self.valid_extensions = VALID_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.bmp', '.zip')
-        
-        # --- Path result for the custom dialog ---
-        self._dialog_path_result = ""
 
         # --- Window Configuration ---
         self.title("Face Folio - Photo Organizer")
@@ -217,10 +221,6 @@ class App(ctk.CTk):
         )
         self.progress_bar.set(0)
         self.progress_bar.grid(row=1, column=0, sticky="ew", padx=0, pady=(5, 0))
-        
-        # --- FIX: Hide status bar elements on launch ---
-        self.status_label.grid_forget()
-        self.progress_bar.grid_forget()
 
         # --- Bind theme change ---
         self_check_theme_change_id = None
@@ -235,88 +235,42 @@ class App(ctk.CTk):
         # --- Bind window close ---
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
-    # --- !! UX FIX !! ---
-    # This new function replaces the old, confusing logic.
-    # It creates a clear "Select Folder" or "Select File" dialog.
+    # ---
+    # --- FEATURE PRESERVED: Select File/Folder/ZIP ---
+    # ---
+    # This helper function is what allows the user to select
+    # any input type, and it is being kept.
+    #
+    def _get_input_path(self, title):
+        """Helper to ask for file or directory using a mixed dialog."""
+        options = {}
+        if 'zip' in self.valid_extensions:
+            options['filetypes'] = (("Image or Zip Files", "*.jpg *.jpeg *.png *.zip"), ("All files", "*.*"))
+        else:
+            options['filetypes'] = (("Image Files", "*.jpg *.jpeg *.png"), ("All files", "*.*"))
+            
+        path = filedialog.askopenfilename(title=f"Select File or Folder for {title}", **options)
+        
+        # If the user selected a file, that's the path.
+        if path:
+            return path
+        
+        # If no file was selected, check if they want to select a folder
+        folder_path = filedialog.askdirectory(title=f"Select Folder for {title}")
+        return folder_path if folder_path else ""
 
-    def _select_input_path(self, title_prefix):
-        """
-        Creates a custom dialog to ask the user if they want a Folder or File.
-        """
-        self._dialog_path_result = "" # Reset result
-        
-        # Create a Toplevel window (a popup)
-        dialog = ctk.CTkToplevel(self)
-        dialog.title("Select Input Type")
-        dialog.geometry("350x150")
-        dialog.transient(self) # Keep it on top
-        dialog.grab_set() # Modal
-        
-        dialog.configure(fg_color=self.current_theme["MENU_COLOR"])
-        
-        label = ctk.CTkLabel(
-            dialog,
-            text=f"What do you want to select for the\n'{title_prefix}'?",
-            font=ctk.CTkFont(size=14),
-            text_color=self.current_theme["TEXT_COLOR"]
-        )
-        label.pack(pady=20, padx=20)
-        
-        btn_frame = ctk.CTkFrame(dialog, fg_color="transparent")
-        btn_frame.pack(pady=10, fill="x", expand=True)
-
-        def _select_folder():
-            path = filedialog.askdirectory(title=f"Select {title_prefix} Folder")
-            if path:
-                self._dialog_path_result = path
-                dialog.destroy()
-
-        def _select_file():
-            path = filedialog.askopenfilename(
-                title=f"Select {title_prefix} File (Image/ZIP)",
-                filetypes=(("Supported Files", "*.jpg *.jpeg *.png *.zip"), ("All files", "*.*"))
-            )
-            if path:
-                self._dialog_path_result = path
-                dialog.destroy()
-
-        folder_btn = ctk.CTkButton(
-            btn_frame,
-            text="Select Folder",
-            command=_select_folder,
-            fg_color=self.current_theme["BTN_COLOR"],
-            text_color=self.current_theme["BTN_TEXT_COLOR"],
-            hover_color=self.current_theme["BTN_HOVER_COLOR"]
-        )
-        folder_btn.pack(side="left", expand=True, padx=20)
-        
-        file_btn = ctk.CTkButton(
-            btn_frame,
-            text="Select File",
-            command=_select_file,
-            fg_color=self.current_theme["BTN_COLOR"],
-            text_color=self.current_theme["BTN_TEXT_COLOR"],
-            hover_color=self.current_theme["BTN_HOVER_COLOR"]
-        )
-        file_btn.pack(side="right", expand=True, padx=20)
-        
-        # Wait for the dialog to be closed
-        self.wait_window(dialog)
-        
-        return self._dialog_path_result
 
     def select_reference_input(self):
         """Open dialog to select the reference (known faces) input."""
-        path = self._select_input_path("Reference Input")
+        path = self._get_input_path("Reference Input")
         if path:
             self.reference_folder.set(path)
 
     def select_event_input(self):
         """Open dialog to select the source event photo input."""
-        path = self._select_input_path("Event Input")
+        path = self._get_input_path("Event Input")
         if path:
             self.event_folder.set(path)
-    # --- END UX FIX ---
 
     def select_output_folder(self):
         """Open dialog to select the destination folder."""
@@ -360,6 +314,9 @@ class App(ctk.CTk):
         )
         process_thread.start()
 
+    # ---
+    # --- FIX #2: CALL THE CORRECT FUNCTION ---
+    # ---
     def start_processing(self, ref_folder, event_folder, out_folder):
         """
         THE REAL CORE LOGIC.
@@ -368,7 +325,9 @@ class App(ctk.CTk):
         print(f"Processing started: {ref_folder}, {event_folder} -> {out_folder}")
         
         try:
-            run_face_analysis(
+            # We are now calling 'run_reference_sort' (from Step 2)
+            # instead of the old, broken 'run_face_analysis' call.
+            run_reference_sort(
                 ref_folder,
                 event_folder,
                 out_folder,
@@ -384,7 +343,9 @@ class App(ctk.CTk):
             self.after(100, lambda: messagebox.showerror("Error", f"An error occurred during processing:\n\n{e}"))
             
         finally:
+            # Re-enable UI elements
             self.set_ui_processing_state(False)
+    # --- END FIX #2 ---
 
     def update_status(self, message, progress):
         """
@@ -392,12 +353,14 @@ class App(ctk.CTk):
         Must be called from the main thread using 'after'.
         """
         def _update():
+            # Update status label
             self.status_label.configure(text=message)
             if "Error" in message:
                 self.status_label.configure(text_color="red")
             else:
                 self.status_label.configure(text_color=self.current_theme["TEXT_COLOR"])
             
+            # Update progress bar
             self.progress_bar.set(progress)
         
         self.after(0, _update)
@@ -408,27 +371,27 @@ class App(ctk.CTk):
         state = "disabled" if is_processing else "normal"
         
         def _update_ui():
+            # Set buttons/entries to disabled state immediately
             self.ref_btn.configure(state=state)
             self.event_btn.configure(state=state)
             self.output_btn.configure(state=state)
             self.start_btn.configure(state=state)
             
-            self.ref_entry.configure(state="disabled" if is_processing else "normal")
-            self.event_entry.configure(state="disabled" if is_processing else "normal")
-            self.output_entry.configure(state="disabled" if is_processing else "normal")
+            # Show progress bar immediately
+            self.progress_bar.set(0)
 
             if is_processing:
                 self.start_btn.configure(text="Processing...")
-                # --- Show status bar elements ---
-                self.status_label.grid(row=0, column=0, sticky="w", padx=0, pady=0)
-                self.progress_bar.grid(row=1, column=0, sticky="ew", padx=0, pady=(5, 0))
+                self.ref_entry.configure(state="disabled")
+                self.event_entry.configure(state="disabled")
+                self.output_entry.configure(state="disabled")
                 self.status_label.configure(text="Processing started...", text_color=self.current_theme["TEXT_COLOR"])
-                self.progress_bar.set(0)
             else:
                 self.start_btn.configure(text="Start Sorting Photos")
-                # --- Hide status bar elements ---
-                self.status_label.grid_forget()
-                self.progress_bar.grid_forget()
+                self.ref_entry.configure(state="normal")
+                self.event_entry.configure(state="normal")
+                self.output_entry.configure(state="normal")
+                self.status_label.configure(text="Ready. Select all three inputs to begin.", text_color=self.current_theme["DISABLED_COLOR"])
                 
 
         self.after(0, _update_ui)
@@ -457,10 +420,12 @@ class App(ctk.CTk):
         self.configure(fg_color=self.current_theme["BG_COLOR"])
         self.title_label.configure(text_color=self.current_theme["TEXT_COLOR"])
 
+        # Update labels and entries
         elements_to_update = [self.ref_label, self.event_label, self.output_label, self.status_label]
         for elem in elements_to_update:
             elem.configure(text_color=self.current_theme["TEXT_COLOR"])
 
+        # Update buttons and entries for theme consistency
         for entry in [self.ref_entry, self.event_entry, self.output_entry]:
             entry.configure(
                 fg_color=self.current_theme["ENTRY_COLOR"],
@@ -474,6 +439,7 @@ class App(ctk.CTk):
                 hover_color=self.current_theme["BTN_HOVER_COLOR"]
             )
 
+        # Update status bar
         self.progress_bar.configure(
             progress_color=self.current_theme["PROGRESS_COLOR"],
             fg_color=self.current_theme["ENTRY_COLOR"],
