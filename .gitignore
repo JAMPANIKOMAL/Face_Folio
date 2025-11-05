@@ -13,8 +13,12 @@ venv/
 ENV/
 .venv/
 build/
-dist/
-# Unignore only .exe files in dist folder for LFS tracking
+# Unignore .exe files in dist folder for LFS tracking
+!dist/
+dist/*
+!dist/FaceFolio/
+dist/FaceFolio/*
+!dist/FaceFolio/*.exe
 !dist/*.exe
 *.egg-info/
 pip-wheel-metadata/
