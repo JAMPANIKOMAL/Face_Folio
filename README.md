@@ -1,6 +1,6 @@
 # Face Folio: Automated Photo Organizer
 
-A Digital Image Processing application that automatically sorts event photos into folders by recognized faces using the [face_recognition](https://github.com/ageitgey/face_recognition) library.
+A Digital Image Processing application that automatically sorts event photos into folders by recognized faces using the [face_recognition](https://github.com/ageitgey/face_recognition) library (powered by dlib).
 
 This application provides two modes:
 
@@ -48,14 +48,14 @@ Face Folio was developed for the Digital Image Processing (G5A23DIP) course at R
 
 ## Features
 
-  - Face recognition via [face_recognition](https://github.com/ageitgey/face_recognition) (using `dlib`'s ResNet model).
-  - **Dual-mode operation:** "Reference Sort" for pre-existing tags and "Auto-Discovery" for new events.
-  - **In-app tagging UI** for naming faces found during Auto-Discovery.
-  - Automated sorting of large photo collections.
-  - Support for Folders, individual Images, and **ZIP archives** as inputs.
-  - GUI built with [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter).
-  - Asynchronous processing to keep the UI responsive.
-  - Local processing for privacy (models are downloaded via `dlib` on first run).
+  - Face recognition via [face_recognition](https://github.com/ageitgey/face_recognition) (using dlib's ResNet model)
+  - **Dual-mode operation:** "Reference Sort" for pre-existing tags and "Auto-Discovery" for new events
+  - **In-app tagging UI** for naming faces found during Auto-Discovery
+  - Automated sorting of large photo collections
+  - Support for Folders, individual Images, and **ZIP archives** as inputs
+  - GUI built with [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter)
+  - Asynchronous processing to keep the UI responsive
+  - Local processing for privacy (dlib models are downloaded on first run)
 
 ## DIP Methodology Focus
 
@@ -95,7 +95,7 @@ Face_Folio/
 
 ### End Users
 
-Download and run the built installer: [FaceFolio-Setup-v1.0.exe](dist/FaceFolio-Setup-v1.0.exe). No Python required. The `dlib` face models will be downloaded on the first run.
+Download and run the built installer: [FaceFolio-Setup-v1.0.exe](dist/FaceFolio-Setup-v1.0.exe). No Python required. The dlib face recognition models will be downloaded automatically on the first run.
 
 ### Developers
 
@@ -107,20 +107,16 @@ cd Face_Folio
 python -m venv venv
 .\venv\Scripts\activate
 
-# Note: dlib and cmake can be difficult to install.
-# It is recommended to install dlib first, e.g., via a wheel:
-# pip install cmake
-# pip install dlib
 pip install -r requirements.txt
 
-# Run the application
 python main.py
 ```
 
 Notes:
 
-  - Python: https://www.python.org/
+  - Python 3.7+: https://www.python.org/
   - `face_recognition` repo & docs: https://github.com/ageitgey/face_recognition
+  - Installing dlib can be tricky on Windows. Pre-built wheels are available at: https://github.com/jloh02/dlib/releases
 
 ## Building & Distribution
 

@@ -1,4 +1,29 @@
 #!/usr/bin/env python3
+"""
+Face Folio - Setup Installer UI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+A professional CustomTkinter-based installer wizard for Face Folio.
+
+Features:
+- 5-page installation wizard (Welcome, Location, Options, Installing, Complete)
+- Customizable installation location
+- Optional desktop and Start Menu shortcuts
+- Windows Registry integration (Add/Remove Programs)
+- Retry logic for file copy operations (handles antivirus file locks)
+- Creates uninstaller with matching UI
+
+Installation Steps:
+1. Creates installation directory
+2. Copies FaceFolio application bundle
+3. Creates uninstaller files
+4. Creates shortcuts (if selected)
+5. Registers in Windows Registry
+
+Author: Jampani Komal
+Version: 1.0
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"""
 
 import customtkinter as ctk
 import tkinter as tk

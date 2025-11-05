@@ -1,6 +1,20 @@
 #!/usr/bin/env python3
 """
-Face Folio - Custom Uninstaller UI (Python-based)
+Face Folio - Uninstaller UI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CustomTkinter-based uninstaller with themed UI.
+
+Features:
+- Loads installation info from install_info.json
+- Removes application directory
+- Removes desktop and Start Menu shortcuts
+- Removes Windows Registry entries
+- Does NOT remove shared model cache (intentional)
+
+Author: Jampani Komal
+Version: 1.0
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
 
 import customtkinter as ctk
@@ -18,7 +32,6 @@ except ImportError:
     print("Warning: winreg not available for uninstallation.")
 
 
-# --- THEME DEFINITIONS (Matching installer_ui.py) ---
 DARK_THEME = {
     "BG_COLOR": "#000000",
     "TEXT_COLOR": "#FFFFFF",
@@ -36,6 +49,13 @@ LIGHT_THEME = {
 }
 
 class UninstallerApp(ctk.CTk):
+    """
+    Main uninstaller window.
+    
+    Provides a simple UI to confirm and execute uninstallation.
+    Reads installation metadata from install_info.json file.
+    """
+    
     def __init__(self):
         super().__init__()
         
@@ -56,7 +76,7 @@ class UninstallerApp(ctk.CTk):
         self.create_ui()
 
     def load_install_info(self):
-        """Load installation path from saved JSON file."""
+        """Load installation metadata from install_info.json file."""
         if os.path.exists(self.install_info_path):
             try:
                 with open(self.install_info_path, 'r') as f:
@@ -66,7 +86,7 @@ class UninstallerApp(ctk.CTk):
                 print(f"Error reading install info: {e}")
 
     def create_ui(self):
-        """Build the uninstaller interface."""
+        """Build the uninstaller user interface."""
         
         title = ctk.CTkLabel(
             self,
@@ -117,7 +137,18 @@ class UninstallerApp(ctk.CTk):
         uninstall_btn.pack(pady=30)
 
     def start_uninstall(self):
-        """Execute the uninstallation steps."""
+        """
+        Execute the complete uninstallation process.
+        
+        Steps:
+        1. Confirm with user
+        2. Remove installation directory
+        3. Remove shortcuts
+        4. Remove registry entry
+        5. Show completion message
+        
+        Note: Does NOT remove shared model cache in user's home directory.
+        """
         if not self.install_location or not os.path.isdir(self.install_location):
             messagebox.showinfo("Uninstall Complete", f"{self.APP_NAME} directory not found. Uninstallation finished.")
             self.remove_registry_entry()
@@ -126,15 +157,8 @@ class UninstallerApp(ctk.CTk):
         
         if messagebox.askyesno("Confirm Uninstall", "This action will permanently delete the application folder. Continue?"):
             try:
-                # Remove the installation directory
                 shutil.rmtree(self.install_location, ignore_errors=True)
                 
-                # --- BUG FIX ---
-                # Removed the line that deleted the shared .deepface cache:
-                # shutil.rmtree(deepface_folder, ignore_errors=True)
-                # --- END BUG FIX ---
-                
-                # Remove shortcuts and registry entry
                 self.remove_shortcuts()
                 self.remove_registry_entry()
                 
@@ -145,7 +169,7 @@ class UninstallerApp(ctk.CTk):
                 messagebox.showerror("Uninstall Error", f"An error occurred while deleting files. Please try manually deleting the folder:\n\n{self.install_location}\n\nError: {e}")
     
     def remove_registry_entry(self):
-        """Remove the Add/Remove Programs registry entry."""
+        """Remove the Windows Registry entry from Add/Remove Programs."""
         if not winreg: return
         try:
             key_path = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\FaceFolio"
@@ -154,7 +178,7 @@ class UninstallerApp(ctk.CTk):
             print(f"Warning: Could not remove registry entry: {e}")
     
     def remove_shortcuts(self):
-        """Attempt to delete desktop and start menu shortcuts."""
+        """Remove desktop shortcut and Start Menu folder."""
         
         desktop = os.path.join(os.path.expanduser("~"), "Desktop")
         desktop_link = os.path.join(desktop, f"{self.APP_NAME}.lnk")
@@ -168,7 +192,7 @@ class UninstallerApp(ctk.CTk):
 
 
 def main():
-    """Main entry point for uninstaller."""
+    """Entry point for the uninstaller."""
     app = UninstallerApp()
     app.mainloop()
 

@@ -1,4 +1,41 @@
 #!/usr/bin/env python3
+"""
+Face Folio - Main Application Window (GUI)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This module implements the complete graphical user interface for Face Folio using
+CustomTkinter. It provides a modern, themed UI with support for both light and dark modes.
+
+Features:
+- Dual operation modes: Reference Sort and Auto-Discovery
+- File/Folder/ZIP input selection
+- Real-time progress tracking with status updates
+- In-app face tagging interface for Auto-Discovery mode
+- Themed modal dialogs (replaces default tkinter messageboxes)
+- Asynchronous processing to maintain UI responsiveness
+- Dynamic theme switching support
+
+UI Layout:
+┌─────────────────────────────────────┐
+│         Face Folio (Title)          │
+├─────────────────────────────────────┤
+│  Mode: [Reference Sort│Auto-Disc]   │
+│  1. Reference Input: [____] [Browse]│
+│  2. Event Input:     [____] [Browse]│
+│  3. Output Folder:   [____] [Browse]│
+├─────────────────────────────────────┤
+│  [Tag Unique Faces Panel]           │
+│  (shown only during tagging)        │
+├─────────────────────────────────────┤
+│  [Start Processing Button]          │
+│  Status: Ready...                   │
+│  [Progress Bar]                     │
+└─────────────────────────────────────┘
+
+Author: Jampani Komal
+Version: 1.0
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"""
 
 import customtkinter as ctk
 from customtkinter import CTkImage 
@@ -41,7 +78,29 @@ LIGHT_THEME = {
 }
 
 class App(ctk.CTk):
+    """
+    Main application window for Face Folio.
+    
+    This class manages the entire UI lifecycle including:
+    - Window initialization and layout
+    - User input handling
+    - Background processing coordination
+    - Theme management
+    - In-app face tagging workflow
+    
+    The app supports two operating modes:
+    1. Reference Sort: User provides known faces, app sorts event photos
+    2. Auto-Discovery: App finds unique faces, user tags them, then sorts
+    """
+    
     def __init__(self, resource_path_func=lambda p: p):
+        """
+        Initialize the main application window.
+        
+        Args:
+            resource_path_func (callable): Function to resolve resource paths
+                                          (handles both dev and PyInstaller builds)
+        """
         super().__init__()
 
         self.resource_path = resource_path_func
@@ -274,6 +333,15 @@ class App(ctk.CTk):
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def on_mode_change(self, mode):
+        """
+        Handle mode switching between Reference Sort and Auto-Discovery.
+        
+        Updates UI to show/hide reference input controls and adjusts labels
+        according to the selected mode.
+        
+        Args:
+            mode (str): Selected mode ("Reference Sort" or "Auto-Discovery")
+        """
         self.tagging_frame.grid_remove()
         
         if mode == "Reference Sort":
@@ -293,6 +361,7 @@ class App(ctk.CTk):
             self.start_btn.configure(text="Start Auto-Discovery")
     
     def _select_input_file(self, target_variable, title):
+        """Helper method to open file selection dialog for images/ZIP files."""
         options = {}
         if 'zip' in self.valid_extensions:
             options['filetypes'] = (("Image or Zip Files", "*.jpg *.jpeg *.png *.zip"), ("All files","*.*"))
@@ -303,6 +372,7 @@ class App(ctk.CTk):
             target_variable.set(path)
 
     def _select_input_folder(self, target_variable, title):
+        """Helper method to open folder selection dialog."""
         folder_path = filedialog.askdirectory(title=title)
         if folder_path:
             target_variable.set(folder_path)
@@ -324,6 +394,15 @@ class App(ctk.CTk):
 
 
     def start_processing_thread(self):
+        """
+        Validate inputs and start photo processing in a background thread.
+        
+        Performs validation on user inputs before starting the processing:
+        - Checks that all required paths exist
+        - Validates path uniqueness
+        - Determines which mode to run (Reference Sort or Auto-Discovery)
+        - Starts processing in a daemon thread to avoid blocking UI
+        """
         if self.is_processing:
             return
 
@@ -371,6 +450,17 @@ class App(ctk.CTk):
         process_thread.start()
 
     def run_reference_sort_process(self, ref_folder, event_folder, out_folder):
+        """
+        Execute Reference Sort mode in background thread.
+        
+        Calls the core sorting function and handles success/error reporting.
+        Updates UI via thread-safe callbacks.
+        
+        Args:
+            ref_folder (str): Path to reference images
+            event_folder (str): Path to event photos
+            out_folder (str): Path to output folder
+        """
         print(f"Processing (Reference Sort) started: {ref_folder}, {event_folder} -> {out_folder}")
         
         try:
@@ -389,6 +479,17 @@ class App(ctk.CTk):
             self.set_ui_processing_state(False)
 
     def run_auto_discovery_process(self, event_folder, out_folder):
+        """
+        Execute Auto-Discovery mode (Step 1: Find unique faces).
+        
+        Scans event photos for unique faces and prepares them for tagging.
+        If faces are found, displays the in-app tagging UI. If no faces found,
+        shows a warning and exits gracefully.
+        
+        Args:
+            event_folder (str): Path to event photos
+            out_folder (str): Path to output folder
+        """
         print(f"Processing (Auto-Discovery) started: {event_folder} -> {out_folder}")
         
         try:
@@ -422,6 +523,13 @@ class App(ctk.CTk):
 
     
     def load_next_portrait(self):
+        """
+        Load and display the next portrait in the tagging queue.
+        
+        Handles image loading, resizing, and display in the tagging UI.
+        Automatically proceeds to on_tag_finish() when all portraits are tagged.
+        Maintains aspect ratio while fitting images within max dimensions.
+        """
         if self.current_portrait_index >= len(self.portraits_to_tag):
             self.on_tag_finish()
             return
@@ -461,6 +569,15 @@ class App(ctk.CTk):
         self.tag_name_entry.focus()
 
     def on_tag_save_and_next(self, event=None):
+        """
+        Save the current face tag and proceed to next portrait.
+        
+        Validates the entered name, renames the portrait file, handles duplicate
+        file conflicts, and moves to the next portrait in the queue.
+        
+        Args:
+            event: Optional keyboard event (when triggered by Enter key)
+        """
         new_name = self.tag_name_entry.get().strip()
         if not new_name:
             self.status_label.configure(text="Please enter a name or click Skip.")
@@ -489,10 +606,18 @@ class App(ctk.CTk):
         self.load_next_portrait()
 
     def on_tag_skip(self):
+        """Skip current portrait without tagging and move to next."""
         self.current_portrait_index += 1
         self.load_next_portrait()
 
     def on_tag_finish(self):
+        """
+        Complete the tagging process and start final photo sorting.
+        
+        Triggered when all portraits are tagged or user clicks "Finish Tagging".
+        Uses the tagged portraits as reference database and runs Reference Sort
+        to organize all event photos based on the tagged faces.
+        """
         self.tagging_frame.grid_remove()
         
         if not self.portraits_to_tag:
@@ -512,6 +637,17 @@ class App(ctk.CTk):
         final_sort_thread.start()
 
     def run_final_sort_process(self, portraits_dir, event_folder, out_folder):
+        """
+        Execute final photo sorting after tagging (Auto-Discovery Step 2).
+        
+        Uses the tagged portrait files as references to sort all event photos.
+        This is the second phase of Auto-Discovery mode.
+        
+        Args:
+            portraits_dir (str): Directory containing tagged portrait files
+            event_folder (str): Path to event photos
+            out_folder (str): Path to output folder
+        """
         try:
             run_reference_sort(
                 portraits_dir,
@@ -533,6 +669,16 @@ class App(ctk.CTk):
     
 
     def update_status(self, message, progress):
+        """
+        Update status label and progress bar (thread-safe).
+        
+        Can be called from background threads. Uses self.after() to ensure
+        UI updates happen on the main thread.
+        
+        Args:
+            message (str): Status message to display
+            progress (float): Progress value between 0.0 and 1.0
+        """
         def _update():
             self.status_label.configure(text=message)
             if "Error" in message:
@@ -545,6 +691,15 @@ class App(ctk.CTk):
         self.after(0, _update)
 
     def set_ui_processing_state(self, is_processing):
+        """
+        Enable or disable UI controls during processing.
+        
+        Updates button states, entries, and text to indicate processing state.
+        Thread-safe via self.after() calls.
+        
+        Args:
+            is_processing (bool): True to disable controls, False to enable
+        """
         self.is_processing = is_processing
         state = "disabled" if is_processing else "normal"
         
@@ -577,6 +732,7 @@ class App(ctk.CTk):
         self.after(0, _update_ui)
 
     def on_closing(self):
+        """Handle window close event with confirmation if processing is active."""
         if self.is_processing:
             if self._show_themed_askyesno("Confirm", "Processing is in progress. Are you sure you want to exit?"):
                 self.destroy()
@@ -584,6 +740,7 @@ class App(ctk.CTk):
             self.destroy()
 
     def check_theme_change(self, event=None):
+        """Detect system theme changes and update UI accordingly."""
         try:
             new_theme_name = ctk.get_appearance_mode()
             if new_theme_name != self.current_theme_name:
@@ -594,6 +751,7 @@ class App(ctk.CTk):
             pass
 
     def update_ui_theme(self):
+        """Apply current theme colors to all UI elements."""
         self.configure(fg_color=self.current_theme["BG_COLOR"])
         self.title_label.configure(text_color=self.current_theme["TEXT_COLOR"])
 
@@ -656,6 +814,21 @@ class App(ctk.CTk):
         )
 
     def _show_themed_dialog(self, title, message, dialog_type, options=None):
+        """
+        Create and display a themed modal dialog.
+        
+        Replaces default tkinter messageboxes with CustomTkinter-styled dialogs
+        that match the application theme.
+        
+        Args:
+            title (str): Dialog window title
+            message (str): Message to display
+            dialog_type (str): Type of dialog ("info", "error", "warning", "askyesno")
+            options: Reserved for future use
+            
+        Returns:
+            bool or None: True/False for askyesno, None for others
+        """
         dialog = ctk.CTkToplevel(self)
         dialog.title(title)
         dialog.transient(self)
@@ -736,15 +909,19 @@ class App(ctk.CTk):
         return result[0]
 
     def _show_themed_info(self, title, message):
+        """Show an informational themed dialog."""
         self._show_themed_dialog(title, message, "info")
 
     def _show_themed_warning(self, title, message):
+        """Show a warning themed dialog."""
         self._show_themed_dialog(title, message, "warning")
 
     def _show_themed_error(self, title, message):
+        """Show an error themed dialog."""
         self._show_themed_dialog(title, message, "error")
 
     def _show_themed_askyesno(self, title, message):
+        """Show a yes/no confirmation themed dialog. Returns True for Yes, False for No."""
         return self._show_themed_dialog(title, message, "askyesno")
 
 

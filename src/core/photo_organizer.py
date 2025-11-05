@@ -1,4 +1,29 @@
 #!/usr/bin/env python3
+"""
+Face Folio - Core Photo Organization Logic
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This module contains the core face recognition and photo sorting logic using the
+face_recognition library (powered by dlib's ResNet-based model).
+
+Key Features:
+- Reference-based photo sorting: Sort photos based on known reference faces
+- Auto-discovery mode: Find unique faces in photos and tag them interactively
+- ZIP file support: Process photos from ZIP archives
+- 128-dimensional face embedding generation using dlib
+- Euclidean distance-based face matching with configurable tolerance
+
+Face Recognition Pipeline:
+1. Load image file
+2. Detect face locations using HOG (Histogram of Oriented Gradients)
+3. Generate 128-d face embeddings using dlib's ResNet model
+4. Compare embeddings using Euclidean distance
+5. Match faces based on tolerance threshold (0.65 by default)
+
+Author: Jampani Komal
+Version: 1.0
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"""
 
 import os
 import shutil
@@ -13,6 +38,20 @@ FACE_MATCH_TOLERANCE = 0.65
 
 
 def _load_reference_encodings(image_paths, progress_callback):
+    """
+    Load face encodings from reference images.
+    
+    Processes a list of reference images and extracts face encodings.
+    The person's name is derived from the filename (e.g., "Alice.jpg" -> "Alice").
+    Only the first detected face in each image is used.
+    
+    Args:
+        image_paths (list): List of absolute paths to reference images
+        progress_callback (callable): Function to report progress (message, progress_value)
+        
+    Returns:
+        tuple: (list of names, list of face encodings)
+    """
     known_face_encodings = []
     known_face_names = []
     total = len(image_paths)
@@ -39,7 +78,26 @@ def _load_reference_encodings(image_paths, progress_callback):
             
     return known_face_names, known_face_encodings
 
+
 def run_reference_sort(ref_input_path, event_input_path, output_folder, update_status_callback):
+    """
+    Sort event photos based on reference faces (Reference Sort Mode).
+    
+    This function performs the main photo sorting operation:
+    1. Loads reference images and learns faces
+    2. Scans event photos for faces
+    3. Matches event photo faces against reference database
+    4. Copies photos to person-specific folders or _NoMatches folder
+    
+    Args:
+        ref_input_path (str): Path to reference folder/file/ZIP
+        event_input_path (str): Path to event photos folder/file/ZIP
+        output_folder (str): Destination folder for sorted photos
+        update_status_callback (callable): Function to update UI status
+        
+    Raises:
+        Exception: If no valid images found or no faces detected in references
+    """
     temp_dirs_to_clean = []
     
     try:
@@ -122,6 +180,17 @@ def run_reference_sort(ref_input_path, event_input_path, output_folder, update_s
 
 
 def _save_portrait(image, face_location, save_path):
+    """
+    Extract and save a face portrait from an image.
+    
+    Crops the face region from the image with padding and saves it as a JPEG.
+    Used in auto-discovery mode to create taggable face portraits.
+    
+    Args:
+        image (numpy.ndarray): Source image array
+        face_location (tuple): Face bounding box (top, right, bottom, left)
+        save_path (str): Destination path for the cropped portrait
+    """
     top, right, bottom, left = face_location
     top = max(0, top - 50)
     left = max(0, left - 50)
@@ -134,7 +203,31 @@ def _save_portrait(image, face_location, save_path):
     pil_image = Image.fromarray(face_image)
     pil_image.save(save_path)
 
+
 def run_auto_discovery(event_input_path, output_folder, update_status_callback):
+    """
+    Discover and extract unique faces from event photos (Auto-Discovery Mode).
+    
+    Scans all event photos, identifies unique faces, and saves cropped portraits
+    for manual tagging. Uses face embedding comparison to avoid duplicate portraits.
+    
+    Process:
+    1. Scan all event photos
+    2. Detect faces in each photo
+    3. Compare against previously found faces (using tolerance)
+    4. Save new unique faces as cropped portraits to _Portraits_To_Tag folder
+    
+    Args:
+        event_input_path (str): Path to event photos folder/file/ZIP
+        output_folder (str): Destination folder (portraits saved to subfolder)
+        update_status_callback (callable): Function to update UI status
+        
+    Returns:
+        list: Paths to saved portrait files for tagging
+        
+    Raises:
+        Exception: If no valid event images found
+    """
     temp_dirs_to_clean = []
     
     try:
@@ -196,6 +289,21 @@ def run_auto_discovery(event_input_path, output_folder, update_status_callback):
 
 
 def find_images(input_path):
+    """
+    Recursively find all valid image files from various input sources.
+    
+    Supports three types of inputs:
+    1. ZIP archives - Extracts to temp directory and scans
+    2. Single image files - Returns as single-item list
+    3. Folders - Recursively scans for all image files
+    
+    Args:
+        input_path (str): Path to folder, image file, or ZIP archive
+        
+    Returns:
+        tuple: (list of absolute image paths, temp directory path or None)
+               Temp directory should be cleaned up by caller if not None
+    """
     image_paths = []
     temp_dir = None
     input_path = Path(input_path)

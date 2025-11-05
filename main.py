@@ -1,4 +1,21 @@
 #!/usr/bin/env python3
+"""
+Face Folio - Main Entry Point
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This is the main entry point for the Face Folio application. It handles:
+- Application initialization and startup
+- Resource path management for both development and PyInstaller builds
+- Window icon loading with fallback support
+- Error handling and user-friendly error messages
+
+The application uses the face_recognition library (dlib-based) for face detection
+and matching, NOT DeepFace as mentioned in some documentation.
+
+Author: Jampani Komal
+Version: 1.0
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"""
 
 import sys
 import os
@@ -20,6 +37,19 @@ except ImportError as e:
 
 
 def resource_path(relative_path):
+    """
+    Get absolute path to resource files.
+    
+    Works for both development (running from source) and production
+    (PyInstaller bundled .exe). PyInstaller creates a temp folder and 
+    stores the path in sys._MEIPASS.
+    
+    Args:
+        relative_path (str): Relative path to the resource file
+        
+    Returns:
+        str: Absolute path to the resource file
+    """
     try:
         base_path = sys._MEIPASS
     except Exception:
@@ -29,6 +59,7 @@ def resource_path(relative_path):
 
 
 def main():
+    """Main entry point for the application."""
     print("Face Folio v1.0 - Starting application...")
 
     try:
