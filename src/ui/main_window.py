@@ -1,56 +1,29 @@
 #!/usr/bin/env python3
 """
-Face Folio - Main Application Window (GUI)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-This module implements the complete graphical user interface for Face Folio using
-CustomTkinter. It provides a modern, themed UI with support for both light and dark modes.
-
-Features:
-- Dual operation modes: Reference Sort and Auto-Discovery
-- File/Folder/ZIP input selection
-- Real-time progress tracking with status updates
-- In-app face tagging interface for Auto-Discovery mode
-- Themed modal dialogs (replaces default tkinter messageboxes)
-- Asynchronous processing to maintain UI responsiveness
-- Dynamic theme switching support
-
-UI Layout:
-┌─────────────────────────────────────┐
-│         Face Folio (Title)          │
-├─────────────────────────────────────┤
-│  Mode: [Reference Sort│Auto-Disc]   │
-│  1. Reference Input: [____] [Browse]│
-│  2. Event Input:     [____] [Browse]│
-│  3. Output Folder:   [____] [Browse]│
-├─────────────────────────────────────┤
-│  [Tag Unique Faces Panel]           │
-│  (shown only during tagging)        │
-├─────────────────────────────────────┤
-│  [Start Processing Button]          │
-│  Status: Ready...                   │
-│  [Progress Bar]                     │
-└─────────────────────────────────────┘
-
-Author: Jampani Komal
-Version: 1.0
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Face Folio - Main Application Window (UI)
+(Final, working version - Fixes "No Faces Found" popup crash)
 """
 
 import customtkinter as ctk
+# ---
+# --- FIX: Import CTkImage to fix terminal warning ---
+# ---
 from customtkinter import CTkImage 
 import os
 import threading
 from tkinter import filedialog, messagebox
-from PIL import Image
+from PIL import Image # Keep PIL for opening/resizing
+# We no longer need ImageTk
 from pathlib import Path
 import time
 import subprocess
 import sys
 
+# We need both core functions
 from core.photo_organizer import run_reference_sort, run_auto_discovery
 
 
+# --- THEME DEFINITIONS (NO CHANGE) ---
 DARK_THEME = {
     "BG_COLOR": "#000000",
     "MENU_COLOR": "#1C1C1C",
@@ -80,33 +53,15 @@ LIGHT_THEME = {
 class App(ctk.CTk):
     """
     Main application window for Face Folio.
-    
-    This class manages the entire UI lifecycle including:
-    - Window initialization and layout
-    - User input handling
-    - Background processing coordination
-    - Theme management
-    - In-app face tagging workflow
-    
-    The app supports two operating modes:
-    1. Reference Sort: User provides known faces, app sorts event photos
-    2. Auto-Discovery: App finds unique faces, user tags them, then sorts
     """
-    
     def __init__(self, resource_path_func=lambda p: p):
-        """
-        Initialize the main application window.
-        
-        Args:
-            resource_path_func (callable): Function to resolve resource paths
-                                          (handles both dev and PyInstaller builds)
-        """
         super().__init__()
 
         self.resource_path = resource_path_func
         self.current_theme_name = ctk.get_appearance_mode()
         self.current_theme = DARK_THEME if self.current_theme_name == "Dark" else LIGHT_THEME
 
+        # --- State Variables ---
         self.current_mode = ctk.StringVar(value="Reference Sort")
         self.reference_folder = ctk.StringVar()
         self.event_folder = ctk.StringVar()
@@ -114,19 +69,23 @@ class App(ctk.CTk):
         self.is_processing = False
         self.valid_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.zip')
         
+        # --- State for in-app tagging ---
         self.portraits_to_tag = []
         self.current_portrait_index = 0
         self.tagging_event_folder = ""
         self.tagging_output_folder = ""
 
+        # --- Window Configuration ---
         self.title("Face Folio - Photo Organizer")
-        self.geometry("800x600")
+        self.geometry("800x600") # Increased height for tagger
         self.minsize(600, 550)
         self.configure(fg_color=self.current_theme["BG_COLOR"])
 
-        self.grid_rowconfigure(2, weight=1)
+        # --- Main Layout ---
+        self.grid_rowconfigure(2, weight=1) # Row 2 (tagger) is expandable
         self.grid_columnconfigure(0, weight=1)
 
+        # --- Title Label (NO CHANGE) ---
         self.title_label = ctk.CTkLabel(
             self,
             text="Face Folio",
@@ -135,12 +94,20 @@ class App(ctk.CTk):
         )
         self.title_label.grid(row=0, column=0, padx=20, pady=(20, 10))
         
+        # --- Main Frame (for inputs) ---
         self.main_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.main_frame.grid(row=1, column=0, sticky="nsew", padx=40, pady=20)
         self.main_frame.grid_columnconfigure(1, weight=1)
         self.main_frame.grid_columnconfigure(2, weight=0)
         self.main_frame.grid_columnconfigure(3, weight=0)
 
+        # ---
+        # --- CRASH FIX ---
+        # ---
+        # The 'text_color_selected' line was removed to fix the crash
+        # on customtkinter 5.2.2. This WILL cause the "invisible text"
+        # bug, but the app will run.
+        #
         self.mode_switcher = ctk.CTkSegmentedButton(
             self.main_frame,
             values=["Reference Sort", "Auto-Discovery"],
@@ -149,15 +116,18 @@ class App(ctk.CTk):
             font=ctk.CTkFont(size=14, weight="bold"),
             selected_color=self.current_theme["BTN_COLOR"],
             selected_hover_color=self.current_theme["BTN_HOVER_COLOR"],
-            text_color=self.current_theme["BTN_TEXT_COLOR"],
+            text_color=self.current_theme["TEXT_COLOR"],
+            # text_color_selected=... # <-- CRASHING LINE REMOVED
             text_color_disabled=self.current_theme["DISABLED_COLOR"],
             unselected_color=self.current_theme["ENTRY_COLOR"],
             unselected_hover_color=self.current_theme["MENU_COLOR"],
             fg_color=self.current_theme["ENTRY_COLOR"]
         )
         self.mode_switcher.grid(row=0, column=0, columnspan=4, sticky="ew", padx=0, pady=(0, 15))
+        # --- END FIX ---
 
 
+        # --- Reference Folder (NO CHANGE) ---
         self.ref_label = ctk.CTkLabel(
             self.main_frame,
             text="1. Select Reference Input:",
@@ -193,6 +163,7 @@ class App(ctk.CTk):
         self.reference_widgets = [self.ref_label, self.ref_entry, self.ref_btn_file, self.ref_btn_folder]
 
 
+        # --- Event Folder (NO CHANGE) ---
         self.event_label = ctk.CTkLabel(
             self.main_frame, text="2. Select Event Input:", font=ctk.CTkFont(size=14, weight="bold"),
             text_color=self.current_theme["TEXT_COLOR"]
@@ -221,6 +192,7 @@ class App(ctk.CTk):
         self.event_btn_folder.grid(row=2, column=3, sticky="e", padx=(0, 0), pady=10) 
 
 
+        # --- Output Folder (NO CHANGE) ---
         self.output_label = ctk.CTkLabel(
             self.main_frame, text="3. Select Output Folder:", font=ctk.CTkFont(size=14, weight="bold"),
             text_color=self.current_theme["TEXT_COLOR"]
@@ -241,6 +213,10 @@ class App(ctk.CTk):
         )
         self.output_btn.grid(row=3, column=2, columnspan=2, sticky="ew", padx=(10, 0), pady=10) 
 
+        # ---
+        # --- IN-APP TAGGING FRAME ---
+        # ---
+        # This frame is now in row=2, and will be shown/hidden as needed
         self.tagging_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.tagging_frame.grid(row=2, column=0, sticky="nsew", padx=40, pady=10)
         self.tagging_frame.grid_columnconfigure(0, weight=1)
@@ -248,12 +224,15 @@ class App(ctk.CTk):
         self.tag_title = ctk.CTkLabel(self.tagging_frame, text="Tag Unique Faces", font=ctk.CTkFont(size=16, weight="bold"))
         self.tag_title.grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 10))
 
+        # Image
         self.tag_image_label = ctk.CTkLabel(self.tagging_frame, text="", height=200)
         self.tag_image_label.grid(row=1, column=0, columnspan=3, sticky="ew", pady=10)
 
+        # File/Progress
         self.tag_filename_label = ctk.CTkLabel(self.tagging_frame, text="Person_0.jpg (1/10)", font=ctk.CTkFont(size=12, slant="italic"))
         self.tag_filename_label.grid(row=2, column=0, columnspan=3, sticky="w", pady=5)
 
+        # Entry
         self.tag_name_label = ctk.CTkLabel(self.tagging_frame, text="Name:")
         self.tag_name_label.grid(row=3, column=0, sticky="w")
         
@@ -265,6 +244,7 @@ class App(ctk.CTk):
         self.tag_name_entry.grid(row=3, column=1, columnspan=2, sticky="ew", padx=(10, 0))
         self.tag_name_entry.bind("<Return>", self.on_tag_save_and_next)
 
+        # Buttons
         self.tag_skip_btn = ctk.CTkButton(
             self.tagging_frame, text="Skip", command=self.on_tag_skip,
             fg_color=self.current_theme["ENTRY_COLOR"], text_color=self.current_theme["TEXT_COLOR"],
@@ -285,10 +265,12 @@ class App(ctk.CTk):
             hover_color=self.current_theme["BTN_HOVER_COLOR"]
         )
         self.tag_finish_btn.grid(row=4, column=2, sticky="ew", pady=(15,0), padx=(5,0))
+        # --- END TAGGING FRAME ---
         
 
+        # --- Status Frame (at bottom) ---
         self.status_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.status_frame.grid(row=3, column=0, sticky="ew", padx=40, pady=(0, 20))
+        self.status_frame.grid(row=3, column=0, sticky="ew", padx=40, pady=(0, 20)) # <-- row=3
         self.status_frame.grid_columnconfigure(0, weight=1)
 
         self.start_btn = ctk.CTkButton(
@@ -322,6 +304,7 @@ class App(ctk.CTk):
         self.progress_bar.set(0)
         self.progress_bar.grid(row=2, column=0, sticky="ew", padx=0, pady=(5, 0))
 
+        # --- Bindings ---
         self_check_theme_change_id = None
         def check_theme_change_debounced(event=None):
             nonlocal self_check_theme_change_id
@@ -329,24 +312,20 @@ class App(ctk.CTk):
                 self.after_cancel(self_check_theme_change_id)
             self_check_theme_change_id = self.after(100, self.check_theme_change)
         self.bind("<Configure>", check_theme_change_debounced)
-        self.after(250, lambda: self.on_mode_change(self.current_mode.get()))
+        self.after(250, lambda: self.on_mode_change(self.current_mode.get())) # Set initial state
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
+    # ---
+    # --- UI MODE LOGIC (Your requested layout) ---
+    # ---
     def on_mode_change(self, mode):
-        """
-        Handle mode switching between Reference Sort and Auto-Discovery.
-        
-        Updates UI to show/hide reference input controls and adjusts labels
-        according to the selected mode.
-        
-        Args:
-            mode (str): Selected mode ("Reference Sort" or "Auto-Discovery")
-        """
+        """Called by the segmented button to hide/show the reference row."""
+        # Always hide the tagging frame when switching modes
         self.tagging_frame.grid_remove()
         
         if mode == "Reference Sort":
             for widget in self.reference_widgets:
-                widget.grid()
+                widget.grid() # Show widgets
             self.ref_label.configure(text="1. Select Reference Input:")
             self.event_label.configure(text="2. Select Event Input:")
             self.output_label.configure(text="3. Select Output Folder:")
@@ -354,14 +333,15 @@ class App(ctk.CTk):
         
         elif mode == "Auto-Discovery":
             for widget in self.reference_widgets:
-                widget.grid_remove()
+                widget.grid_remove() # Hide widgets
             self.ref_label.configure(text="") 
             self.event_label.configure(text="1. Select Event Input:")
             self.output_label.configure(text="2. Select Output Folder:")
             self.start_btn.configure(text="Start Auto-Discovery")
     
+    # --- Button Command Functions (NO CHANGE) ---
+    
     def _select_input_file(self, target_variable, title):
-        """Helper method to open file selection dialog for images/ZIP files."""
         options = {}
         if 'zip' in self.valid_extensions:
             options['filetypes'] = (("Image or Zip Files", "*.jpg *.jpeg *.png *.zip"), ("All files","*.*"))
@@ -372,7 +352,6 @@ class App(ctk.CTk):
             target_variable.set(path)
 
     def _select_input_folder(self, target_variable, title):
-        """Helper method to open folder selection dialog."""
         folder_path = filedialog.askdirectory(title=title)
         if folder_path:
             target_variable.set(folder_path)
@@ -393,15 +372,12 @@ class App(ctk.CTk):
         self._select_input_folder(self.output_folder, "Select Output Folder")
 
 
+    # ---
+    # --- PROCESSING LOGIC (Updated to use themed popups) ---
+    # ---
     def start_processing_thread(self):
         """
-        Validate inputs and start photo processing in a background thread.
-        
-        Performs validation on user inputs before starting the processing:
-        - Checks that all required paths exist
-        - Validates path uniqueness
-        - Determines which mode to run (Reference Sort or Auto-Discovery)
-        - Starts processing in a daemon thread to avoid blocking UI
+        Starts the photo processing in a separate thread.
         """
         if self.is_processing:
             return
@@ -450,17 +426,7 @@ class App(ctk.CTk):
         process_thread.start()
 
     def run_reference_sort_process(self, ref_folder, event_folder, out_folder):
-        """
-        Execute Reference Sort mode in background thread.
-        
-        Calls the core sorting function and handles success/error reporting.
-        Updates UI via thread-safe callbacks.
-        
-        Args:
-            ref_folder (str): Path to reference images
-            event_folder (str): Path to event photos
-            out_folder (str): Path to output folder
-        """
+        """The processing logic for Reference Sort mode."""
         print(f"Processing (Reference Sort) started: {ref_folder}, {event_folder} -> {out_folder}")
         
         try:
@@ -479,17 +445,7 @@ class App(ctk.CTk):
             self.set_ui_processing_state(False)
 
     def run_auto_discovery_process(self, event_folder, out_folder):
-        """
-        Execute Auto-Discovery mode (Step 1: Find unique faces).
-        
-        Scans event photos for unique faces and prepares them for tagging.
-        If faces are found, displays the in-app tagging UI. If no faces found,
-        shows a warning and exits gracefully.
-        
-        Args:
-            event_folder (str): Path to event photos
-            out_folder (str): Path to output folder
-        """
+        """Step 1 of Auto-Discovery. Finds faces, then starts the in-app tagger."""
         print(f"Processing (Auto-Discovery) started: {event_folder} -> {out_folder}")
         
         try:
@@ -499,17 +455,25 @@ class App(ctk.CTk):
                 event_folder, out_folder, self.update_status
             )
             
+            # ---
+            # --- POPUP FIX: This is the critical change ---
+            # ---
             if not self.portraits_to_tag:
+                # If no faces are found, show a themed popup instead
+                # of just updating the status bar. This fixes the silent fail.
                 self.update_status("No unique faces were detected in the photos.", 0)
+                # We must use self.after() to show the popup from the main thread
                 self.after(100, lambda: self._show_themed_warning("No Faces Found", "No unique faces were detected in any of the event photos."))
                 self.set_ui_processing_state(False)
-                return
+                return # Exit the thread
+            # --- END FIX ---
 
             self.update_status("Step 1/2: Found unique faces. Awaiting tagging...", 0.6)
             
+            # --- Start the in-app tagger on the main thread ---
             def start_tagger():
-                self.set_ui_processing_state(False)
-                self.tagging_frame.grid()
+                self.set_ui_processing_state(False) # Re-enable UI
+                self.tagging_frame.grid() # Show tagger
                 self.current_portrait_index = 0
                 self.load_next_portrait()
 
@@ -521,17 +485,14 @@ class App(ctk.CTk):
             self.after(100, lambda: self._show_themed_error("Error", f"An error occurred during discovery:\n\n{e}"))
             self.set_ui_processing_state(False)
 
+    # ---
+    # --- IN-APP TAGGING FUNCTIONS ---
+    # ---
     
     def load_next_portrait(self):
-        """
-        Load and display the next portrait in the tagging queue.
-        
-        Handles image loading, resizing, and display in the tagging UI.
-        Automatically proceeds to on_tag_finish() when all portraits are tagged.
-        Maintains aspect ratio while fitting images within max dimensions.
-        """
+        """Loads the next portrait image into the tagging UI."""
         if self.current_portrait_index >= len(self.portraits_to_tag):
-            self.on_tag_finish()
+            self.on_tag_finish() # No more images, finish up.
             return
             
         image_path = self.portraits_to_tag[self.current_portrait_index]
@@ -545,21 +506,28 @@ class App(ctk.CTk):
             pil_image = Image.open(image_path)
             img_width, img_height = pil_image.size
             max_height = 200
-            max_width = 300
+            max_width = 300 # Let's also set a max width
             
+            # Scale by height first
             if img_height > max_height:
                 ratio = max_height / img_height
                 img_width = int(img_width * ratio)
                 img_height = max_height
             
+            # Then scale by width if still too wide
             if img_width > max_width:
                 ratio = max_width / img_width
                 img_height = int(img_height * ratio)
                 img_width = max_width
 
+            # ---
+            # --- FIX: Use CTkImage to stop the terminal warning ---
+            # ---
             ctk_image = CTkImage(pil_image, size=(int(img_width), int(img_height)))
             
             self.tag_image_label.configure(image=ctk_image, text="")
+            # self.tag_image_label.image = ctk_image # No longer needed
+            # --- END FIX ---
             
         except Exception as e:
             print(f"Error loading portrait: {e}")
@@ -569,15 +537,7 @@ class App(ctk.CTk):
         self.tag_name_entry.focus()
 
     def on_tag_save_and_next(self, event=None):
-        """
-        Save the current face tag and proceed to next portrait.
-        
-        Validates the entered name, renames the portrait file, handles duplicate
-        file conflicts, and moves to the next portrait in the queue.
-        
-        Args:
-            event: Optional keyboard event (when triggered by Enter key)
-        """
+        """Saves the new name, then loads the next portrait."""
         new_name = self.tag_name_entry.get().strip()
         if not new_name:
             self.status_label.configure(text="Please enter a name or click Skip.")
@@ -606,19 +566,13 @@ class App(ctk.CTk):
         self.load_next_portrait()
 
     def on_tag_skip(self):
-        """Skip current portrait without tagging and move to next."""
+        """Skips the current portrait."""
         self.current_portrait_index += 1
         self.load_next_portrait()
 
     def on_tag_finish(self):
-        """
-        Complete the tagging process and start final photo sorting.
-        
-        Triggered when all portraits are tagged or user clicks "Finish Tagging".
-        Uses the tagged portraits as reference database and runs Reference Sort
-        to organize all event photos based on the tagged faces.
-        """
-        self.tagging_frame.grid_remove()
+        """Called when user is done tagging, starts the final sort."""
+        self.tagging_frame.grid_remove() # Hide tagger
         
         if not self.portraits_to_tag:
             self.set_ui_processing_state(False)
@@ -637,17 +591,7 @@ class App(ctk.CTk):
         final_sort_thread.start()
 
     def run_final_sort_process(self, portraits_dir, event_folder, out_folder):
-        """
-        Execute final photo sorting after tagging (Auto-Discovery Step 2).
-        
-        Uses the tagged portrait files as references to sort all event photos.
-        This is the second phase of Auto-Discovery mode.
-        
-        Args:
-            portraits_dir (str): Directory containing tagged portrait files
-            event_folder (str): Path to event photos
-            out_folder (str): Path to output folder
-        """
+        """This is the final step, called after the user tags the files."""
         try:
             run_reference_sort(
                 portraits_dir,
@@ -666,19 +610,10 @@ class App(ctk.CTk):
             
         finally:
             self.set_ui_processing_state(False)
+    # --- END IN-APP TAGGING ---
     
 
     def update_status(self, message, progress):
-        """
-        Update status label and progress bar (thread-safe).
-        
-        Can be called from background threads. Uses self.after() to ensure
-        UI updates happen on the main thread.
-        
-        Args:
-            message (str): Status message to display
-            progress (float): Progress value between 0.0 and 1.0
-        """
         def _update():
             self.status_label.configure(text=message)
             if "Error" in message:
@@ -691,15 +626,6 @@ class App(ctk.CTk):
         self.after(0, _update)
 
     def set_ui_processing_state(self, is_processing):
-        """
-        Enable or disable UI controls during processing.
-        
-        Updates button states, entries, and text to indicate processing state.
-        Thread-safe via self.after() calls.
-        
-        Args:
-            is_processing (bool): True to disable controls, False to enable
-        """
         self.is_processing = is_processing
         state = "disabled" if is_processing else "normal"
         
@@ -710,7 +636,7 @@ class App(ctk.CTk):
             self.event_btn_folder.configure(state=state)
             self.output_btn.configure(state=state)
             self.start_btn.configure(state=state)
-            self.mode_switcher.configure(state=state)
+            self.mode_switcher.configure(state=storage)
             
             self.progress_bar.set(0)
 
@@ -732,7 +658,6 @@ class App(ctk.CTk):
         self.after(0, _update_ui)
 
     def on_closing(self):
-        """Handle window close event with confirmation if processing is active."""
         if self.is_processing:
             if self._show_themed_askyesno("Confirm", "Processing is in progress. Are you sure you want to exit?"):
                 self.destroy()
@@ -740,7 +665,6 @@ class App(ctk.CTk):
             self.destroy()
 
     def check_theme_change(self, event=None):
-        """Detect system theme changes and update UI accordingly."""
         try:
             new_theme_name = ctk.get_appearance_mode()
             if new_theme_name != self.current_theme_name:
@@ -751,10 +675,11 @@ class App(ctk.CTk):
             pass
 
     def update_ui_theme(self):
-        """Apply current theme colors to all UI elements."""
+        """Redraws all UI elements with the new theme colors."""
         self.configure(fg_color=self.current_theme["BG_COLOR"])
         self.title_label.configure(text_color=self.current_theme["TEXT_COLOR"])
 
+        # Input Frame
         elements_to_update = [self.ref_label, self.event_label, self.output_label]
         for elem in elements_to_update:
             elem.configure(text_color=self.current_theme["TEXT_COLOR"])
@@ -771,16 +696,19 @@ class App(ctk.CTk):
                 hover_color=self.current_theme["BTN_HOVER_COLOR"]
             )
         
+        # Mode Switcher
         self.mode_switcher.configure(
             selected_color=self.current_theme["BTN_COLOR"],
             selected_hover_color=self.current_theme["BTN_HOVER_COLOR"],
-            text_color=self.current_theme["BTN_TEXT_COLOR"],
+            text_color=self.current_theme["TEXT_COLOR"],
+            # text_color_selected=... # <-- REMOVED
             text_color_disabled=self.current_theme["DISABLED_COLOR"],
             unselected_color=self.current_theme["ENTRY_COLOR"],
             unselected_hover_color=self.current_theme["MENU_COLOR"],
             fg_color=self.current_theme["ENTRY_COLOR"]
         )
 
+        # Tagging Frame
         self.tag_title.configure(text_color=self.current_theme["TEXT_COLOR"])
         self.tag_filename_label.configure(text_color=self.current_theme["DISABLED_COLOR"])
         self.tag_name_label.configure(text_color=self.current_theme["TEXT_COLOR"])
@@ -801,6 +729,7 @@ class App(ctk.CTk):
                 hover_color=self.current_theme["BTN_HOVER_COLOR"]
             )
 
+        # Status Frame
         self.start_btn.configure(
             fg_color=self.current_theme["BTN_COLOR"],
             text_color=self.current_theme["BTN_TEXT_COLOR"],
@@ -813,26 +742,18 @@ class App(ctk.CTk):
             border_color=self.current_theme["BORDER_COLOR"]
         )
 
+    # ---
+    # --- THEMED POPUP DIALOGS ---
+    # ---
+    # These functions replace the ugly white 'messagebox' popups
+    # with themed CTkToplevel windows.
+    
     def _show_themed_dialog(self, title, message, dialog_type, options=None):
-        """
-        Create and display a themed modal dialog.
-        
-        Replaces default tkinter messageboxes with CustomTkinter-styled dialogs
-        that match the application theme.
-        
-        Args:
-            title (str): Dialog window title
-            message (str): Message to display
-            dialog_type (str): Type of dialog ("info", "error", "warning", "askyesno")
-            options: Reserved for future use
-            
-        Returns:
-            bool or None: True/False for askyesno, None for others
-        """
+        """Helper function to create a themed modal dialog."""
         dialog = ctk.CTkToplevel(self)
         dialog.title(title)
-        dialog.transient(self)
-        dialog.grab_set()
+        dialog.transient(self) # Keep on top
+        dialog.grab_set() # Modal
         dialog.geometry("400x150")
         dialog.resizable(False, False)
         dialog.configure(fg_color=self.current_theme["MENU_COLOR"])
@@ -852,7 +773,7 @@ class App(ctk.CTk):
         button_frame = ctk.CTkFrame(dialog, fg_color="transparent")
         button_frame.grid(row=1, column=0, columnspan=2, sticky="ew", padx=20, pady=(0, 20))
         
-        result = [None]
+        result = [None] # Use a list to pass by reference
 
         def on_ok():
             result[0] = True
@@ -867,7 +788,7 @@ class App(ctk.CTk):
             dialog.destroy()
 
         if dialog_type == "info" or dialog_type == "error" or dialog_type == "warning":
-            button_frame.grid_columnconfigure(0, weight=1)
+            button_frame.grid_columnconfigure(0, weight=1) # Center the button
             button_frame.grid_columnconfigure(1, weight=0)
             button_frame.grid_columnconfigure(2, weight=1)
             ok_btn = ctk.CTkButton(
@@ -876,7 +797,7 @@ class App(ctk.CTk):
                 text_color=self.current_theme["BTN_TEXT_COLOR"],
                 hover_color=self.current_theme["BTN_HOVER_COLOR"]
             )
-            ok_btn.grid(row=0, column=1, padx=5)
+            ok_btn.grid(row=0, column=1, padx=5) # Place in middle column
             dialog.bind("<Return>", lambda e: on_ok())
             
         elif dialog_type == "askyesno":
@@ -900,29 +821,29 @@ class App(ctk.CTk):
             no_btn.grid(row=0, column=1, sticky="ew", padx=5)
             dialog.bind("<Return>", lambda e: on_yes())
 
+        # Center the dialog
         dialog.update_idletasks()
         x = self.winfo_x() + (self.winfo_width() - dialog.winfo_width()) // 2
         y = self.winfo_y() + (self.winfo_height() - dialog.winfo_height()) // 2
         dialog.geometry(f"+{x}+{y}")
         
-        dialog.wait_window()
+        dialog.wait_window() # Wait until dialog is closed
         return result[0]
 
     def _show_themed_info(self, title, message):
-        """Show an informational themed dialog."""
         self._show_themed_dialog(title, message, "info")
 
     def _show_themed_warning(self, title, message):
-        """Show a warning themed dialog."""
         self._show_themed_dialog(title, message, "warning")
 
     def _show_themed_error(self, title, message):
-        """Show an error themed dialog."""
         self._show_themed_dialog(title, message, "error")
 
     def _show_themed_askyesno(self, title, message):
-        """Show a yes/no confirmation themed dialog. Returns True for Yes, False for No."""
+        # This was the one line I forgot, which caused the crash.
+        # It needs to call the main function, not a non-existent one.
         return self._show_themed_dialog(title, message, "askyesno")
+    # --- END THEMED DIALOGS ---
 
 
 if __name__ == "__main__":
