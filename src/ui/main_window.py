@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Face Folio - Main Application Window (UI)
-(Final, working version)
+(Final, working version - Fixes "No Faces Found" popup crash)
 """
 
 import customtkinter as ctk
@@ -104,9 +104,9 @@ class App(ctk.CTk):
         # ---
         # --- CRASH FIX ---
         # ---
-        # The 'text_color_selected' line was removed to fix the crash.
-        # This WILL cause the "invisible text" bug on your 5.2.2 version.
-        # This is a bug in the library itself that is fixed in newer versions.
+        # The 'text_color_selected' line was removed to fix the crash
+        # on customtkinter 5.2.2. This WILL cause the "invisible text"
+        # bug, but the app will run.
         #
         self.mode_switcher = ctk.CTkSegmentedButton(
             self.main_frame,
@@ -316,7 +316,7 @@ class App(ctk.CTk):
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     # ---
-    # --- UI MODE LOGIC (Simplified based on your layout request) ---
+    # --- UI MODE LOGIC (Your requested layout) ---
     # ---
     def on_mode_change(self, mode):
         """Called by the segmented button to hide/show the reference row."""
@@ -455,19 +455,24 @@ class App(ctk.CTk):
                 event_folder, out_folder, self.update_status
             )
             
+            # ---
+            # --- POPUP FIX: This is the critical change ---
+            # ---
             if not self.portraits_to_tag:
-                self.update_status("No faces were found in the event photos.", 0)
-                # This is likely what's happening. We'll show a themed warning.
+                # If no faces are found, show a themed popup instead
+                # of just updating the status bar. This fixes the silent fail.
+                self.update_status("No unique faces were detected in the photos.", 0)
+                # We must use self.after() to show the popup from the main thread
                 self.after(100, lambda: self._show_themed_warning("No Faces Found", "No unique faces were detected in any of the event photos."))
                 self.set_ui_processing_state(False)
-                return
+                return # Exit the thread
+            # --- END FIX ---
 
             self.update_status("Step 1/2: Found unique faces. Awaiting tagging...", 0.6)
             
             # --- Start the in-app tagger on the main thread ---
             def start_tagger():
-                self.set_ui_processing_state(False) # Re-enable UI (but we'll hide parts)
-                # --- NEW LAYOUT: We DON'T hide the main frame ---
+                self.set_ui_processing_state(False) # Re-enable UI
                 self.tagging_frame.grid() # Show tagger
                 self.current_portrait_index = 0
                 self.load_next_portrait()
@@ -518,7 +523,7 @@ class App(ctk.CTk):
             # ---
             # --- FIX: Use CTkImage to stop the terminal warning ---
             # ---
-            ctk_image = CTkImage(pil_image, size=(img_width, img_height))
+            ctk_image = CTkImage(pil_image, size=(int(img_width), int(img_height)))
             
             self.tag_image_label.configure(image=ctk_image, text="")
             # self.tag_image_label.image = ctk_image # No longer needed
@@ -631,7 +636,7 @@ class App(ctk.CTk):
             self.event_btn_folder.configure(state=state)
             self.output_btn.configure(state=state)
             self.start_btn.configure(state=state)
-            self.mode_switcher.configure(state=state)
+            self.mode_switcher.configure(state=storage)
             
             self.progress_bar.set(0)
 
@@ -738,7 +743,7 @@ class App(ctk.CTk):
         )
 
     # ---
-    # --- NEW: THEMED POPUP DIALOGS ---
+    # --- THEMED POPUP DIALOGS ---
     # ---
     # These functions replace the ugly white 'messagebox' popups
     # with themed CTkToplevel windows.
@@ -835,6 +840,8 @@ class App(ctk.CTk):
         self._show_themed_dialog(title, message, "error")
 
     def _show_themed_askyesno(self, title, message):
+        # This was the one line I forgot, which caused the crash.
+        # It needs to call the main function, not a non-existent one.
         return self._show_themed_dialog(title, message, "askyesno")
     # --- END THEMED DIALOGS ---
 

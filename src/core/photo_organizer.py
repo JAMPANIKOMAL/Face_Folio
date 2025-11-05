@@ -46,6 +46,10 @@ def _load_reference_encodings(image_paths, progress_callback):
         if progress_callback:
             progress_callback(f"Learning face: {name} ({i+1}/{total})", 0.3 + (0.3 * (i / total)))
         
+        # ---
+        # --- DEBUG LOGGING ---
+        # ---
+        print(f"[DEBUG] Learning reference: {image_path}")
         try:
             image = face_recognition.load_image_file(image_path)
             encodings = face_recognition.face_encodings(image)
@@ -110,6 +114,10 @@ def run_reference_sort(ref_input_path, event_input_path, output_folder, update_s
             progress = 0.6 + (0.4 * (i / total))
             update_status_callback(f"Analyzing {filename} ({i+1}/{total})", progress)
             
+            # ---
+            # --- DEBUG LOGGING ---
+            # ---
+            print(f"[DEBUG] Processing event file: {image_path}")
             try:
                 unknown_image = face_recognition.load_image_file(image_path)
                 unknown_encodings = face_recognition.face_encodings(unknown_image)
@@ -140,6 +148,7 @@ def run_reference_sort(ref_input_path, event_input_path, output_folder, update_s
                         
             except Exception as e:
                 print(f"Error processing {filename}: {e}")
+                # Try to copy to NoMatches even if processing fails
                 try:
                     dest_path = os.path.join(unknown_folder, filename)
                     if not os.path.exists(dest_path):
@@ -206,6 +215,10 @@ def run_auto_discovery(event_input_path, output_folder, update_status_callback):
             progress = 0.3 + (0.7 * (i / total))
             update_status_callback(f"Analyzing {filename} ({i+1}/{total})", progress)
 
+            # ---
+            # --- DEBUG LOGGING ---
+            # ---
+            print(f"[DEBUG] Processing event file: {image_path}")
             try:
                 image = face_recognition.load_image_file(image_path)
                 face_locations = face_recognition.face_locations(image)
