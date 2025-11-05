@@ -5,25 +5,19 @@ Face Folio - Main Application Window (UI)
 """
 
 import customtkinter as ctk
-# ---
-# --- FIX: Import CTkImage to fix terminal warning ---
-# ---
 from customtkinter import CTkImage 
 import os
 import threading
 from tkinter import filedialog, messagebox
-from PIL import Image # Keep PIL for opening/resizing
-# We no longer need ImageTk
+from PIL import Image
 from pathlib import Path
 import time
 import subprocess
 import sys
 
-# We need both core functions
 from core.photo_organizer import run_reference_sort, run_auto_discovery
 
 
-# --- THEME DEFINITIONS (NO CHANGE) ---
 DARK_THEME = {
     "BG_COLOR": "#000000",
     "MENU_COLOR": "#1C1C1C",
@@ -116,8 +110,7 @@ class App(ctk.CTk):
             font=ctk.CTkFont(size=14, weight="bold"),
             selected_color=self.current_theme["BTN_COLOR"],
             selected_hover_color=self.current_theme["BTN_HOVER_COLOR"],
-            text_color=self.current_theme["TEXT_COLOR"],
-            # text_color_selected=... # <-- CRASHING LINE REMOVED
+            text_color=self.current_theme["BTN_TEXT_COLOR"],
             text_color_disabled=self.current_theme["DISABLED_COLOR"],
             unselected_color=self.current_theme["ENTRY_COLOR"],
             unselected_hover_color=self.current_theme["MENU_COLOR"],
@@ -320,12 +313,11 @@ class App(ctk.CTk):
     # ---
     def on_mode_change(self, mode):
         """Called by the segmented button to hide/show the reference row."""
-        # Always hide the tagging frame when switching modes
         self.tagging_frame.grid_remove()
         
         if mode == "Reference Sort":
             for widget in self.reference_widgets:
-                widget.grid() # Show widgets
+                widget.grid()
             self.ref_label.configure(text="1. Select Reference Input:")
             self.event_label.configure(text="2. Select Event Input:")
             self.output_label.configure(text="3. Select Output Folder:")
@@ -333,7 +325,7 @@ class App(ctk.CTk):
         
         elif mode == "Auto-Discovery":
             for widget in self.reference_widgets:
-                widget.grid_remove() # Hide widgets
+                widget.grid_remove()
             self.ref_label.configure(text="") 
             self.event_label.configure(text="1. Select Event Input:")
             self.output_label.configure(text="2. Select Output Folder:")
@@ -700,8 +692,7 @@ class App(ctk.CTk):
         self.mode_switcher.configure(
             selected_color=self.current_theme["BTN_COLOR"],
             selected_hover_color=self.current_theme["BTN_HOVER_COLOR"],
-            text_color=self.current_theme["TEXT_COLOR"],
-            # text_color_selected=... # <-- REMOVED
+            text_color=self.current_theme["BTN_TEXT_COLOR"],
             text_color_disabled=self.current_theme["DISABLED_COLOR"],
             unselected_color=self.current_theme["ENTRY_COLOR"],
             unselected_hover_color=self.current_theme["MENU_COLOR"],
