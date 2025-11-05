@@ -15,6 +15,17 @@ import face_recognition
 VALID_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.bmp')
 
 # ---
+# --- ACCURACY TWEAK: TOLERANCE ---
+# ---
+# We define our tolerance here. 0.6 is the default (strict).
+# A higher value (e.g., 0.65) is "looser" and will match more faces.
+# A lower value (e.g., 0.55) is "stricter" and will match fewer.
+# We will use 0.65 as a good starting point to identify more photos.
+FACE_MATCH_TOLERANCE = 0.65
+# --- END ACCURACY TWEAK ---
+
+
+# ---
 # --- FEATURE 1: REFERENCE-BASED SORTING ---
 # --- (Restored from old core.py) ---
 # ---
@@ -106,7 +117,12 @@ def run_reference_sort(ref_input_path, event_input_path, output_folder, update_s
                 found_in_photo = set()
                 
                 for encoding in unknown_encodings:
-                    matches = face_recognition.compare_faces(known_encodings, encoding)
+                    #
+                    # --- ACCURACY TWEAK #1 (REFERENCE SORT) ---
+                    # We added the 'tolerance' parameter here
+                    #
+                    matches = face_recognition.compare_faces(known_encodings, encoding, tolerance=FACE_MATCH_TOLERANCE)
+                    
                     if True in matches:
                         first_match_index = matches.index(True)
                         name = known_names[first_match_index]
@@ -204,7 +220,12 @@ def run_auto_discovery(event_input_path, output_folder, update_status_callback):
                         portrait_files.append(portrait_path)
                         continue
 
-                    matches = face_recognition.compare_faces(known_face_encodings, encoding)
+                    #
+                    # --- ACCURACY TWEAK #2 (AUTO DISCOVERY) ---
+                    # We added the 'tolerance' parameter here too, so that
+                    # auto-discovery doesn't create duplicate portraits.
+                    #
+                    matches = face_recognition.compare_faces(known_face_encodings, encoding, tolerance=FACE_MATCH_TOLERANCE)
                     
                     if True not in matches:
                         # This is a new unique face
