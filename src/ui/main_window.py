@@ -7,18 +7,14 @@ import customtkinter as ctk
 import os
 import threading
 from tkinter import filedialog, messagebox
-from PIL import Image
+from PIL import Image, ImageTk
 from pathlib import Path
 import time
-import subprocess # NEW IMPORT for opening the folder
+import subprocess
+import sys
 
-# ---
-# --- NEW: IMPORT BOTH CORE FUNCTIONS ---
-# ---
-# We now need both functions from our core logic file
-#
+# We need both core functions
 from core.photo_organizer import run_reference_sort, run_auto_discovery
-# --- END NEW IMPORTS ---
 
 
 # --- THEME DEFINITIONS (NO CHANGE) ---
@@ -65,16 +61,22 @@ class App(ctk.CTk):
         self.event_folder = ctk.StringVar()
         self.output_folder = ctk.StringVar()
         self.is_processing = False
-        self.valid_extensions = VALID_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.bmp', '.zip')
+        self.valid_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.zip')
+        
+        # --- State for in-app tagging ---
+        self.portraits_to_tag = []
+        self.current_portrait_index = 0
+        self.tagging_event_folder = ""
+        self.tagging_output_folder = ""
 
-        # --- Window Configuration (NO CHANGE) ---
+        # --- Window Configuration ---
         self.title("Face Folio - Photo Organizer")
-        self.geometry("800x550") # <-- Increased height slightly for new button
-        self.minsize(600, 500)
+        self.geometry("800x600") # Increased height for tagger
+        self.minsize(600, 550)
         self.configure(fg_color=self.current_theme["BG_COLOR"])
 
-        # --- Main Layout (NO CHANGE) ---
-        self.grid_rowconfigure(1, weight=1)
+        # --- Main Layout ---
+        self.grid_rowconfigure(2, weight=1) # Make row 2 (tagger) expandable
         self.grid_columnconfigure(0, weight=1)
 
         # --- Title Label (NO CHANGE) ---
@@ -94,8 +96,12 @@ class App(ctk.CTk):
         self.main_frame.grid_columnconfigure(3, weight=0)
 
         # ---
-        # --- NEW: MODE SWITCHER ---
+        # --- CRASH FIX ---
         # ---
+        # The 'text_color_selected' line was removed to fix the crash
+        # on customtkinter 5.2.2. The 'invisible text' bug
+        # will be present, but the app will run.
+        #
         self.mode_switcher = ctk.CTkSegmentedButton(
             self.main_frame,
             values=["Reference Sort", "Auto-Discovery"],
@@ -105,24 +111,24 @@ class App(ctk.CTk):
             selected_color=self.current_theme["BTN_COLOR"],
             selected_hover_color=self.current_theme["BTN_HOVER_COLOR"],
             text_color=self.current_theme["TEXT_COLOR"],
+            # text_color_selected=self.current_theme["BTN_TEXT_COLOR"], # <-- REMOVED
             text_color_disabled=self.current_theme["DISABLED_COLOR"],
             unselected_color=self.current_theme["ENTRY_COLOR"],
             unselected_hover_color=self.current_theme["MENU_COLOR"],
             fg_color=self.current_theme["ENTRY_COLOR"]
         )
         self.mode_switcher.grid(row=0, column=0, columnspan=4, sticky="ew", padx=0, pady=(0, 15))
-        # --- END NEW FEATURE ---
+        # --- END FIX ---
 
 
-        # --- Reference Folder (Row index changed) ---
-        # We need to store these widgets so we can hide/show them
+        # --- Reference Folder (NO CHANGE) ---
         self.ref_label = ctk.CTkLabel(
             self.main_frame,
             text="1. Select Reference Input:",
             font=ctk.CTkFont(size=14, weight="bold"),
             text_color=self.current_theme["TEXT_COLOR"]
         )
-        self.ref_label.grid(row=1, column=0, sticky="w", padx=(0, 10), pady=10) # <-- row=1
+        self.ref_label.grid(row=1, column=0, sticky="w", padx=(0, 10), pady=10)
 
         self.ref_entry = ctk.CTkEntry(
             self.main_frame,
@@ -133,116 +139,131 @@ class App(ctk.CTk):
             border_color=self.current_theme["BORDER_COLOR"],
             border_width=1
         )
-        self.ref_entry.grid(row=1, column=1, sticky="ew", pady=10) # <-- row=1
+        self.ref_entry.grid(row=1, column=1, sticky="ew", pady=10) 
 
         self.ref_btn_file = ctk.CTkButton(
-            self.main_frame,
-            text="Select File/ZIP...",
-            font=ctk.CTkFont(size=12, weight="bold"),
-            command=self.select_reference_file, 
-            fg_color=self.current_theme["BTN_COLOR"],
-            text_color=self.current_theme["BTN_TEXT_COLOR"],
-            hover_color=self.current_theme["BTN_HOVER_COLOR"],
-            width=120
+            self.main_frame, text="Select File/ZIP...", font=ctk.CTkFont(size=12, weight="bold"),
+            command=self.select_reference_file, fg_color=self.current_theme["BTN_COLOR"],
+            text_color=self.current_theme["BTN_TEXT_COLOR"], hover_color=self.current_theme["BTN_HOVER_COLOR"], width=120
         )
-        self.ref_btn_file.grid(row=1, column=2, sticky="e", padx=(10, 5), pady=10) # <-- row=1
+        self.ref_btn_file.grid(row=1, column=2, sticky="e", padx=(10, 5), pady=10) 
 
         self.ref_btn_folder = ctk.CTkButton(
-            self.main_frame,
-            text="Select Folder...",
-            font=ctk.CTkFont(size=12, weight="bold"),
-            command=self.select_reference_folder, 
-            fg_color=self.current_theme["BTN_COLOR"],
-            text_color=self.current_theme["BTN_TEXT_COLOR"],
-            hover_color=self.current_theme["BTN_HOVER_COLOR"],
-            width=120
+            self.main_frame, text="Select Folder...", font=ctk.CTkFont(size=12, weight="bold"),
+            command=self.select_reference_folder, fg_color=self.current_theme["BTN_COLOR"],
+            text_color=self.current_theme["BTN_TEXT_COLOR"], hover_color=self.current_theme["BTN_HOVER_COLOR"], width=120
         )
-        self.ref_btn_folder.grid(row=1, column=3, sticky="e", padx=(0, 0), pady=10) # <-- row=1
-
-        # Store all reference widgets in a list for easy hiding/showing
+        self.ref_btn_folder.grid(row=1, column=3, sticky="e", padx=(0, 0), pady=10) 
         self.reference_widgets = [self.ref_label, self.ref_entry, self.ref_btn_file, self.ref_btn_folder]
 
 
-        # --- Event Folder (Row index changed) ---
+        # --- Event Folder (NO CHANGE) ---
         self.event_label = ctk.CTkLabel(
-            self.main_frame,
-            text="2. Select Event Input:", 
-            font=ctk.CTkFont(size=14, weight="bold"),
+            self.main_frame, text="2. Select Event Input:", font=ctk.CTkFont(size=14, weight="bold"),
             text_color=self.current_theme["TEXT_COLOR"]
         )
-        self.event_label.grid(row=2, column=0, sticky="w", padx=(0, 10), pady=10) # <-- row=2
+        self.event_label.grid(row=2, column=0, sticky="w", padx=(0, 10), pady=10) 
 
         self.event_entry = ctk.CTkEntry(
-            self.main_frame,
-            textvariable=self.event_folder,
-            font=ctk.CTkFont(size=12),
-            fg_color=self.current_theme["ENTRY_COLOR"],
-            text_color=self.current_theme["TEXT_COLOR"],
-            border_color=self.current_theme["BORDER_COLOR"],
-            border_width=1
+            self.main_frame, textvariable=self.event_folder, font=ctk.CTkFont(size=12),
+            fg_color=self.current_theme["ENTRY_COLOR"], text_color=self.current_theme["TEXT_COLOR"],
+            border_color=self.current_theme["BORDER_COLOR"], border_width=1
         )
-        self.event_entry.grid(row=2, column=1, sticky="ew", pady=10) # <-- row=2
+        self.event_entry.grid(row=2, column=1, sticky="ew", pady=10) 
 
         self.event_btn_file = ctk.CTkButton(
-            self.main_frame,
-            text="Select File/ZIP...",
-            font=ctk.CTkFont(size=12, weight="bold"),
-            command=self.select_event_file,
-            fg_color=self.current_theme["BTN_COLOR"],
-            text_color=self.current_theme["BTN_TEXT_COLOR"],
-            hover_color=self.current_theme["BTN_HOVER_COLOR"],
-            width=120
+            self.main_frame, text="Select File/ZIP...", font=ctk.CTkFont(size=12, weight="bold"),
+            command=self.select_event_file, fg_color=self.current_theme["BTN_COLOR"],
+            text_color=self.current_theme["BTN_TEXT_COLOR"], hover_color=self.current_theme["BTN_HOVER_COLOR"], width=120
         )
-        self.event_btn_file.grid(row=2, column=2, sticky="e", padx=(10, 5), pady=10) # <-- row=2
+        self.event_btn_file.grid(row=2, column=2, sticky="e", padx=(10, 5), pady=10) 
 
         self.event_btn_folder = ctk.CTkButton(
-            self.main_frame,
-            text="Select Folder...",
-            font=ctk.CTkFont(size=12, weight="bold"),
-            command=self.select_event_folder, 
-            fg_color=self.current_theme["BTN_COLOR"],
-            text_color=self.current_theme["BTN_TEXT_COLOR"],
-            hover_color=self.current_theme["BTN_HOVER_COLOR"],
-            width=120
+            self.main_frame, text="Select Folder...", font=ctk.CTkFont(size=12, weight="bold"),
+            command=self.select_event_folder, fg_color=self.current_theme["BTN_COLOR"],
+            text_color=self.current_theme["BTN_TEXT_COLOR"], hover_color=self.current_theme["BTN_HOVER_COLOR"], width=120
         )
-        self.event_btn_folder.grid(row=2, column=3, sticky="e", padx=(0, 0), pady=10) # <-- row=2
+        self.event_btn_folder.grid(row=2, column=3, sticky="e", padx=(0, 0), pady=10) 
 
 
-        # --- Output Folder (Row index changed) ---
+        # --- Output Folder (NO CHANGE) ---
         self.output_label = ctk.CTkLabel(
-            self.main_frame,
-            text="3. Select Output Folder:",
-            font=ctk.CTkFont(size=14, weight="bold"),
+            self.main_frame, text="3. Select Output Folder:", font=ctk.CTkFont(size=14, weight="bold"),
             text_color=self.current_theme["TEXT_COLOR"]
         )
-        self.output_label.grid(row=3, column=0, sticky="w", padx=(0, 10), pady=10) # <-- row=3
+        self.output_label.grid(row=3, column=0, sticky="w", padx=(0, 10), pady=10) 
 
         self.output_entry = ctk.CTkEntry(
-            self.main_frame,
-            textvariable=self.output_folder,
-            font=ctk.CTkFont(size=12),
-            fg_color=self.current_theme["ENTRY_COLOR"],
-            text_color=self.current_theme["TEXT_COLOR"],
-            border_color=self.current_theme["BORDER_COLOR"],
-            border_width=1
+            self.main_frame, textvariable=self.output_folder, font=ctk.CTkFont(size=12),
+            fg_color=self.current_theme["ENTRY_COLOR"], text_color=self.current_theme["TEXT_COLOR"],
+            border_color=self.current_theme["BORDER_COLOR"], border_width=1
         )
-        self.output_entry.grid(row=3, column=1, sticky="ew", pady=10) # <-- row=3
+        self.output_entry.grid(row=3, column=1, sticky="ew", pady=10) 
 
         self.output_btn = ctk.CTkButton(
-            self.main_frame,
-            text="Select Folder...",
-            font=ctk.CTkFont(size=12, weight="bold"),
-            command=self.select_output_folder,
-            fg_color=self.current_theme["BTN_COLOR"],
-            text_color=self.current_theme["BTN_TEXT_COLOR"],
+            self.main_frame, text="Select Folder...", font=ctk.CTkFont(size=12, weight="bold"),
+            command=self.select_output_folder, fg_color=self.current_theme["BTN_COLOR"],
+            text_color=self.current_theme["BTN_TEXT_COLOR"], hover_color=self.current_theme["BTN_HOVER_COLOR"]
+        )
+        self.output_btn.grid(row=3, column=2, columnspan=2, sticky="ew", padx=(10, 0), pady=10) 
+
+        # ---
+        # --- IN-APP TAGGING FRAME ---
+        # ---
+        self.tagging_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.tagging_frame.grid(row=2, column=0, sticky="nsew", padx=40, pady=10)
+        self.tagging_frame.grid_columnconfigure(0, weight=1)
+        
+        self.tag_title = ctk.CTkLabel(self.tagging_frame, text="Tag Unique Faces", font=ctk.CTkFont(size=16, weight="bold"))
+        self.tag_title.grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 10))
+
+        # Image
+        self.tag_image_label = ctk.CTkLabel(self.tagging_frame, text="", height=200)
+        self.tag_image_label.grid(row=1, column=0, columnspan=3, sticky="ew", pady=10)
+
+        # File/Progress
+        self.tag_filename_label = ctk.CTkLabel(self.tagging_frame, text="Person_0.jpg (1/10)", font=ctk.CTkFont(size=12, slant="italic"))
+        self.tag_filename_label.grid(row=2, column=0, columnspan=3, sticky="w", pady=5)
+
+        # Entry
+        self.tag_name_label = ctk.CTkLabel(self.tagging_frame, text="Name:")
+        self.tag_name_label.grid(row=3, column=0, sticky="w")
+        
+        self.tag_name_entry = ctk.CTkEntry(
+            self.tagging_frame, font=ctk.CTkFont(size=12),
+            fg_color=self.current_theme["ENTRY_COLOR"], text_color=self.current_theme["TEXT_COLOR"],
+            border_color=self.current_theme["BORDER_COLOR"], border_width=1
+        )
+        self.tag_name_entry.grid(row=3, column=1, columnspan=2, sticky="ew", padx=(10, 0))
+        self.tag_name_entry.bind("<Return>", self.on_tag_save_and_next)
+
+        # Buttons
+        self.tag_skip_btn = ctk.CTkButton(
+            self.tagging_frame, text="Skip", command=self.on_tag_skip,
+            fg_color=self.current_theme["ENTRY_COLOR"], text_color=self.current_theme["TEXT_COLOR"],
+            hover_color=self.current_theme["MENU_COLOR"]
+        )
+        self.tag_skip_btn.grid(row=4, column=0, sticky="ew", pady=(15,0), padx=(0,5))
+        
+        self.tag_save_btn = ctk.CTkButton(
+            self.tagging_frame, text="Save & Next", command=self.on_tag_save_and_next,
+            fg_color=self.current_theme["BTN_COLOR"], text_color=self.current_theme["BTN_TEXT_COLOR"],
             hover_color=self.current_theme["BTN_HOVER_COLOR"]
         )
-        self.output_btn.grid(row=3, column=2, columnspan=2, sticky="ew", padx=(10, 0), pady=10) # <-- row=3
+        self.tag_save_btn.grid(row=4, column=1, sticky="ew", pady=(15,0), padx=5)
 
+        self.tag_finish_btn = ctk.CTkButton(
+            self.tagging_frame, text="Finish Tagging", command=self.on_tag_finish,
+            fg_color=self.current_theme["BTN_COLOR"], text_color=self.current_theme["BTN_TEXT_COLOR"],
+            hover_color=self.current_theme["BTN_HOVER_COLOR"]
+        )
+        self.tag_finish_btn.grid(row=4, column=2, sticky="ew", pady=(15,0), padx=(5,0))
+        # --- END TAGGING FRAME ---
         
-        # --- Status Frame (at bottom) (NO CHANGE) ---
+
+        # --- Status Frame (at bottom) ---
         self.status_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.status_frame.grid(row=2, column=0, sticky="ew", padx=40, pady=(0, 20))
+        self.status_frame.grid(row=3, column=0, sticky="ew", padx=40, pady=(0, 20)) # <-- row=3
         self.status_frame.grid_columnconfigure(0, weight=1)
 
         self.start_btn = ctk.CTkButton(
@@ -276,7 +297,7 @@ class App(ctk.CTk):
         self.progress_bar.set(0)
         self.progress_bar.grid(row=2, column=0, sticky="ew", padx=0, pady=(5, 0))
 
-        # --- Bind theme change ---
+        # --- Bindings ---
         self_check_theme_change_id = None
         def check_theme_change_debounced(event=None):
             nonlocal self_check_theme_change_id
@@ -284,20 +305,22 @@ class App(ctk.CTk):
                 self.after_cancel(self_check_theme_change_id)
             self_check_theme_change_id = self.after(100, self.check_theme_change)
         self.bind("<Configure>", check_theme_change_debounced)
-        self.after(200, self.check_theme_change)
         self.after(250, lambda: self.on_mode_change(self.current_mode.get())) # Set initial state
-
-        # --- Bind window close (NO CHANGE) ---
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     # ---
-    # --- NEW: HIDE/SHOW LOGIC ---
+    # --- UI MODE LOGIC (UPDATED) ---
     # ---
     def on_mode_change(self, mode):
         """Called by the segmented button to hide/show the reference row."""
+        # Always hide the tagging frame when switching modes
+        self.tagging_frame.grid_remove()
+        
         if mode == "Reference Sort":
             for widget in self.reference_widgets:
                 widget.grid() # Show widgets
+            self.main_frame.grid() # Show inputs
+            self.status_frame.grid() # Show status
             self.ref_label.configure(text="1. Select Reference Input:")
             self.event_label.configure(text="2. Select Event Input:")
             self.output_label.configure(text="3. Select Output Folder:")
@@ -306,12 +329,13 @@ class App(ctk.CTk):
         elif mode == "Auto-Discovery":
             for widget in self.reference_widgets:
                 widget.grid_remove() # Hide widgets
-            self.ref_label.configure(text="") # Clear text to prevent layout shift
+            self.main_frame.grid() # Show inputs
+            self.status_frame.grid() # Show status
+            self.ref_label.configure(text="") 
             self.event_label.configure(text="1. Select Event Input:")
             self.output_label.configure(text="2. Select Output Folder:")
             self.start_btn.configure(text="Start Auto-Discovery")
-    # --- END NEW FEATURE ---
-
+    
     # --- Button Command Functions (NO CHANGE) ---
     
     def _select_input_file(self, target_variable, title):
@@ -320,7 +344,6 @@ class App(ctk.CTk):
             options['filetypes'] = (("Image or Zip Files", "*.jpg *.jpeg *.png *.zip"), ("All files","*.*"))
         else:
             options['filetypes'] = (("Image Files", "*.jpg *.jpeg *.png"), ("All files", "*.*"))
-            
         path = filedialog.askopenfilename(title=title, **options)
         if path:
             target_variable.set(path)
@@ -347,7 +370,7 @@ class App(ctk.CTk):
 
 
     # ---
-    # --- UPDATED: PROCESSING LOGIC ---
+    # --- PROCESSING LOGIC (UPDATED) ---
     # ---
     def start_processing_thread(self):
         """
@@ -355,37 +378,34 @@ class App(ctk.CTk):
         Now checks which mode is active.
         """
         if self.is_processing:
-            print("Already processing.")
             return
 
         mode = self.current_mode.get()
         event_folder = self.event_folder.get()
         out_folder = self.output_folder.get()
 
-        # --- Validation for BOTH modes ---
         if not event_folder or not Path(event_folder).exists():
-            messagebox.showerror("Error", "Please select a valid Event input (Folder/Image/ZIP).")
+            self._show_themed_error("Error", "Please select a valid Event input (Folder/Image/ZIP).")
             return
         if not out_folder or not Path(out_folder).is_dir():
-            messagebox.showerror("Error", "Please select a valid Output folder.")
+            self._show_themed_error("Error", "Please select a valid Output folder.")
             return
         
         if mode == "Reference Sort":
             ref_folder = self.reference_folder.get()
             if not ref_folder or not Path(ref_folder).exists():
-                messagebox.showerror("Error", "Please select a valid Reference input (Folder/Image/ZIP).")
+                self._show_themed_error("Error", "Please select a valid Reference input (Folder/Image/ZIP).")
                 return
             if ref_folder == event_folder or ref_folder == out_folder:
-                messagebox.showwarning("Warning", "All three paths must be unique.")
+                self._show_themed_warning("Warning", "All three paths must be unique.")
                 return
         
         if event_folder == out_folder:
-            messagebox.showwarning("Warning", "Event and Output paths must be unique.")
+            self._show_themed_warning("Warning", "Event and Output paths must be unique.")
             return
 
         self.set_ui_processing_state(True)
         
-        # --- NEW: Call the correct thread target based on mode ---
         if mode == "Reference Sort":
             process_thread = threading.Thread(
                 target=self.run_reference_sort_process, 
@@ -393,6 +413,9 @@ class App(ctk.CTk):
                 daemon=True
             )
         else: # Auto-Discovery
+            # Save paths for the *final* sort later
+            self.tagging_event_folder = event_folder
+            self.tagging_output_folder = out_folder
             process_thread = threading.Thread(
                 target=self.run_auto_discovery_process, 
                 args=(event_folder, out_folder),
@@ -407,109 +430,171 @@ class App(ctk.CTk):
         
         try:
             run_reference_sort(
-                ref_folder,
-                event_folder,
-                out_folder,
-                self.update_status 
+                ref_folder, event_folder, out_folder, self.update_status 
             )
-            
             self.update_status("Processing complete!", 1.0)
-            self.after(100, lambda: messagebox.showinfo("Complete", "Photo sorting finished successfully!"))
+            self.after(100, lambda: self._show_themed_info("Complete", "Photo sorting finished successfully!"))
             
         except Exception as e:
             print(f"Error during processing: {e}")
             self.update_status(f"Error: {e}", 0)
-            self.after(100, lambda: messagebox.showerror("Error", f"An error occurred during processing:\n\n{e}"))
+            self.after(100, lambda: self._show_themed_error("Error", f"An error occurred during processing:\n\n{e}"))
             
         finally:
             self.set_ui_processing_state(False)
 
     def run_auto_discovery_process(self, event_folder, out_folder):
-        """The new, multi-step processing logic for Auto-Discovery mode."""
+        """Step 1 of Auto-Discovery. Finds faces, then starts the in-app tagger."""
         print(f"Processing (Auto-Discovery) started: {event_folder} -> {out_folder}")
         
         try:
-            # --- Step 1: Find unique faces ---
-            self.update_status("Step 1/3: Finding unique faces...", 0.1)
-            portraits_dir = os.path.join(out_folder, "_Portraits_To_Tag")
+            self.update_status("Step 1/2: Finding unique faces...", 0.1)
             
-            portrait_files = run_auto_discovery(
-                event_folder,
-                out_folder,
-                self.update_status
+            self.portraits_to_tag = run_auto_discovery(
+                event_folder, out_folder, self.update_status
             )
             
-            if not portrait_files:
+            if not self.portraits_to_tag:
                 self.update_status("No faces were found in the event photos.", 0)
-                self.after(100, lambda: messagebox.showwarning("No Faces Found", "No faces were detected in any of the event photos."))
+                self.after(100, lambda: self._show_themed_warning("No Faces Found", "No faces were detected in any of the event photos."))
                 self.set_ui_processing_state(False)
                 return
 
-            self.update_status("Step 2/3: Waiting for user to tag portraits...", 0.6)
+            self.update_status("Step 1/2: Found unique faces. Awaiting tagging...", 0.6)
             
-            # --- Step 2: Stop and ask user to tag ---
-            # We must run this on the main thread using .after()
-            def ask_user_to_tag():
-                try:
-                    # Open the folder for the user
-                    if os.name == 'nt': # Windows
-                        os.startfile(portraits_dir)
-                    elif os.name == 'posix': # macOS/Linux
-                        subprocess.call(('open' if sys.platform == 'darwin' else 'xdg-open', portraits_dir))
-                except Exception as e:
-                    print(f"Could not auto-open folder: {e}")
+            # --- Start the in-app tagger on the main thread ---
+            def start_tagger():
+                self.set_ui_processing_state(False) # Re-enable UI (but we'll hide parts)
+                self.main_frame.grid_remove() # Hide inputs
+                self.status_frame.grid_remove() # Hide main status bar
+                self.tagging_frame.grid() # Show tagger
+                self.current_portrait_index = 0
+                self.load_next_portrait()
 
-                # Show the blocking message box
-                messagebox.showinfo(
-                    "Tag Your Photos",
-                    f"I found {len(portrait_files)} unique people!\n\n"
-                    f"I have opened the folder:\n{portraits_dir}\n\n"
-                    "Please rename the 'Person_X.jpg' files to their real names (e.g., 'Alice.jpg').\n\n"
-                    "Click OK when you are finished."
-                )
-                
-                # --- Step 3: Start the final sort (after user clicks OK) ---
-                self.update_status("Step 3/3: Sorting photos based on tags...", 0.7)
-                
-                # We need a new thread for this final step
-                final_sort_thread = threading.Thread(
-                    target=self.run_final_sort_process,
-                    args=(portraits_dir, event_folder, out_folder),
-                    daemon=True
-                )
-                final_sort_thread.start()
-
-            self.after(100, ask_user_to_tag)
+            self.after(100, start_tagger)
 
         except Exception as e:
             print(f"Error during auto-discovery: {e}")
             self.update_status(f"Error: {e}", 0)
-            self.after(100, lambda: messagebox.showerror("Error", f"An error occurred during discovery:\n\n{e}"))
+            self.after(100, lambda: self._show_themed_error("Error", f"An error occurred during discovery:\n\n{e}"))
             self.set_ui_processing_state(False)
+
+    # ---
+    # --- IN-APP TAGGING FUNCTIONS ---
+    # ---
+    
+    def load_next_portrait(self):
+        """Loads the next portrait image into the tagging UI."""
+        if self.current_portrait_index >= len(self.portraits_to_tag):
+            self.on_tag_finish() # No more images, finish up.
+            return
+            
+        image_path = self.portraits_to_tag[self.current_portrait_index]
+        filename = os.path.basename(image_path)
+        
+        self.tag_filename_label.configure(
+            text=f"{filename} ({self.current_portrait_index + 1}/{len(self.portraits_to_tag)})"
+        )
+        
+        try:
+            pil_image = Image.open(image_path)
+            img_width, img_height = pil_image.size
+            max_height = 200
+            if img_height > max_height:
+                ratio = max_height / img_height
+                img_width = int(img_width * ratio)
+                img_height = max_height
+                pil_image = pil_image.resize((img_width, img_height), Image.LANCZOS)
+
+            ctk_image = ImageTk.PhotoImage(pil_image)
+            self.tag_image_label.configure(image=ctk_image, text="")
+            self.tag_image_label.image = ctk_image
+            
+        except Exception as e:
+            print(f"Error loading portrait: {e}")
+            self.tag_image_label.configure(image=None, text=f"Error loading image:\n{filename}")
+            
+        self.tag_name_entry.delete(0, "end")
+        self.tag_name_entry.focus()
+
+    def on_tag_save_and_next(self, event=None):
+        """Saves the new name, then loads the next portrait."""
+        new_name = self.tag_name_entry.get().strip()
+        if not new_name:
+            self.status_label.configure(text="Please enter a name or click Skip.")
+            return
+            
+        try:
+            old_path = self.portraits_to_tag[self.current_portrait_index]
+            dir_name = os.path.dirname(old_path)
+            new_name = "".join(c for c in new_name if c.isalnum() or c in (' ', '_', '-')).rstrip()
+            new_path = os.path.join(dir_name, f"{new_name}.jpg")
+            
+            if os.path.exists(new_path):
+                if new_path not in self.portraits_to_tag:
+                    if not self._show_themed_askyesno("Warning", f"'{new_name}.jpg' already exists. Do you want to overwrite it?"):
+                        return
+            
+            os.rename(old_path, new_path)
+            self.portraits_to_tag[self.current_portrait_index] = new_path
+            
+        except Exception as e:
+            print(f"Error renaming file: {e}")
+            self._show_themed_error("Error", f"Could not rename file: {e}")
+            return
+            
+        self.current_portrait_index += 1
+        self.load_next_portrait()
+
+    def on_tag_skip(self):
+        """Skips the current portrait."""
+        self.current_portrait_index += 1
+        self.load_next_portrait()
+
+    def on_tag_finish(self):
+        """Called when user is done tagging, starts the final sort."""
+        self.tagging_frame.grid_remove() # Hide tagger
+        self.main_frame.grid() # Show inputs
+        self.status_frame.grid() # Show status bar
+        
+        if not self.portraits_to_tag:
+            self.set_ui_processing_state(False)
+            return
+
+        portraits_dir = os.path.dirname(self.portraits_to_tag[0])
+        
+        self.set_ui_processing_state(True)
+        self.update_status("Step 2/2: Sorting photos based on tags...", 0.7)
+        
+        final_sort_thread = threading.Thread(
+            target=self.run_final_sort_process,
+            args=(portraits_dir, self.tagging_event_folder, self.tagging_output_folder),
+            daemon=True
+        )
+        final_sort_thread.start()
 
     def run_final_sort_process(self, portraits_dir, event_folder, out_folder):
         """This is the final step, called after the user tags the files."""
         try:
-            # We just re-use the reference sort, pointing it at the new portraits dir!
             run_reference_sort(
                 portraits_dir,
                 event_folder,
                 out_folder,
-                lambda msg, prog: self.update_status(f"Step 3/3: {msg}", 0.7 + (prog * 0.3))
+                lambda msg, prog: self.update_status(f"Step 2/2: {msg}", 0.7 + (prog * 0.3))
             )
             
             self.update_status("Auto-Discovery complete!", 1.0)
-            self.after(100, lambda: messagebox.showinfo("Complete", "Photo sorting finished successfully!"))
+            self.after(100, lambda: self._show_themed_info("Complete", "Photo sorting finished successfully!"))
 
         except Exception as e:
             print(f"Error during final sort: {e}")
             self.update_status(f"Error: {e}", 0)
-            self.after(100, lambda: messagebox.showerror("Error", f"An error occurred during the final sort:\n\n{e}"))
+            self.after(100, lambda: self._show_themed_error("Error", f"An error occurred during the final sort:\n\n{e}"))
             
         finally:
             self.set_ui_processing_state(False)
-    # --- END UPDATED LOGIC ---
-
+    # --- END IN-APP TAGGING ---
+    
 
     def update_status(self, message, progress):
         def _update():
@@ -528,39 +613,36 @@ class App(ctk.CTk):
         state = "disabled" if is_processing else "normal"
         
         def _update_ui():
-            # Disable all inputs
             self.ref_btn_file.configure(state=state)
             self.ref_btn_folder.configure(state=state)
             self.event_btn_file.configure(state=state)
             self.event_btn_folder.configure(state=state)
             self.output_btn.configure(state=state)
             self.start_btn.configure(state=state)
-            self.mode_switcher.configure(state=state) # <-- Also disable mode switcher
+            self.mode_switcher.configure(state=state)
             
             self.progress_bar.set(0)
 
             if is_processing:
-                # Use the button's current text
                 current_text = self.start_btn.cget("text")
-                self.start_btn.configure(text=f"{current_text.replace('Start ', '')}ing...")
+                if "Start " in current_text:
+                    self.start_btn.configure(text=f"{current_text.replace('Start ', '')}ing...")
                 self.ref_entry.configure(state="disabled")
                 self.event_entry.configure(state="disabled")
                 self.output_entry.configure(state="disabled")
                 self.status_label.configure(text="Processing started...", text_color=self.current_theme["TEXT_COLOR"])
             else:
-                # Restore text based on mode
                 self.on_mode_change(self.current_mode.get()) 
                 self.ref_entry.configure(state="normal")
                 self.event_entry.configure(state="normal")
                 self.output_entry.configure(state="normal")
                 self.status_label.configure(text="Ready. Select inputs to begin.", text_color=self.current_theme["DISABLED_COLOR"])
                 
-
         self.after(0, _update_ui)
 
     def on_closing(self):
         if self.is_processing:
-            if messagebox.askyesno("Confirm", "Processing is in progress. Are you sure you want to exit?"):
+            if self._show_themed_askyesno("Confirm", "Processing is in progress. Are you sure you want to exit?"):
                 self.destroy()
         else:
             self.destroy()
@@ -576,44 +658,172 @@ class App(ctk.CTk):
             pass
 
     def update_ui_theme(self):
+        """Redraws all UI elements with the new theme colors."""
         self.configure(fg_color=self.current_theme["BG_COLOR"])
         self.title_label.configure(text_color=self.current_theme["TEXT_COLOR"])
 
-        elements_to_update = [self.ref_label, self.event_label, self.output_label, self.status_label]
+        # Input Frame
+        elements_to_update = [self.ref_label, self.event_label, self.output_label]
         for elem in elements_to_update:
             elem.configure(text_color=self.current_theme["TEXT_COLOR"])
-
         for entry in [self.ref_entry, self.event_entry, self.output_entry]:
             entry.configure(
                 fg_color=self.current_theme["ENTRY_COLOR"],
                 text_color=self.current_theme["TEXT_COLOR"],
                 border_color=self.current_theme["BORDER_COLOR"]
             )
-            
-        for btn in [self.ref_btn_file, self.ref_btn_folder, self.event_btn_file, self.event_btn_folder, self.output_btn, self.start_btn]:
+        for btn in [self.ref_btn_file, self.ref_btn_folder, self.event_btn_file, self.event_btn_folder, self.output_btn]:
             btn.configure(
                 fg_color=self.current_theme["BTN_COLOR"],
                 text_color=self.current_theme["BTN_TEXT_COLOR"],
                 hover_color=self.current_theme["BTN_HOVER_COLOR"]
             )
         
-        # --- NEW: Update theme for mode switcher ---
+        # Mode Switcher
         self.mode_switcher.configure(
             selected_color=self.current_theme["BTN_COLOR"],
             selected_hover_color=self.current_theme["BTN_HOVER_COLOR"],
             text_color=self.current_theme["TEXT_COLOR"],
+            # text_color_selected=self.current_theme["BTN_TEXT_COLOR"], # <-- REMOVED
             text_color_disabled=self.current_theme["DISABLED_COLOR"],
             unselected_color=self.current_theme["ENTRY_COLOR"],
             unselected_hover_color=self.current_theme["MENU_COLOR"],
             fg_color=self.current_theme["ENTRY_COLOR"]
         )
-        # --- END NEW ---
 
+        # Tagging Frame
+        self.tag_title.configure(text_color=self.current_theme["TEXT_COLOR"])
+        self.tag_filename_label.configure(text_color=self.current_theme["DISABLED_COLOR"])
+        self.tag_name_label.configure(text_color=self.current_theme["TEXT_COLOR"])
+        self.tag_name_entry.configure(
+            fg_color=self.current_theme["ENTRY_COLOR"],
+            text_color=self.current_theme["TEXT_COLOR"],
+            border_color=self.current_theme["BORDER_COLOR"]
+        )
+        self.tag_skip_btn.configure(
+            fg_color=self.current_theme["ENTRY_COLOR"],
+            text_color=self.current_theme["TEXT_COLOR"],
+            hover_color=self.current_theme["MENU_COLOR"]
+        )
+        for btn in [self.tag_save_btn, self.tag_finish_btn]:
+            btn.configure(
+                fg_color=self.current_theme["BTN_COLOR"],
+                text_color=self.current_theme["BTN_TEXT_COLOR"],
+                hover_color=self.current_theme["BTN_HOVER_COLOR"]
+            )
+
+        # Status Frame
+        self.start_btn.configure(
+            fg_color=self.current_theme["BTN_COLOR"],
+            text_color=self.current_theme["BTN_TEXT_COLOR"],
+            hover_color=self.current_theme["BTN_HOVER_COLOR"]
+        )
+        self.status_label.configure(text_color=self.current_theme["DISABLED_COLOR"])
         self.progress_bar.configure(
             progress_color=self.current_theme["PROGRESS_COLOR"],
             fg_color=self.current_theme["ENTRY_COLOR"],
             border_color=self.current_theme["BORDER_COLOR"]
         )
+
+    # ---
+    # --- NEW: THEMED POPUP DIALOGS ---
+    # ---
+    # These functions replace the ugly white 'messagebox' popups
+    # with themed CTkToplevel windows.
+    
+    def _show_themed_dialog(self, title, message, dialog_type, options=None):
+        """Helper function to create a themed modal dialog."""
+        dialog = ctk.CTkToplevel(self)
+        dialog.title(title)
+        dialog.transient(self) # Keep on top
+        dialog.grab_set() # Modal
+        dialog.geometry("400x150")
+        dialog.resizable(False, False)
+        dialog.configure(fg_color=self.current_theme["MENU_COLOR"])
+        
+        dialog.grid_columnconfigure(0, weight=1)
+        dialog.grid_rowconfigure(0, weight=1)
+        
+        label = ctk.CTkLabel(
+            dialog,
+            text=message,
+            font=ctk.CTkFont(size=13),
+            text_color=self.current_theme["TEXT_COLOR"],
+            wraplength=380
+        )
+        label.grid(row=0, column=0, columnspan=2, sticky="nsew", padx=20, pady=20)
+        
+        button_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        button_frame.grid(row=1, column=0, columnspan=2, sticky="ew", padx=20, pady=(0, 20))
+        button_frame.grid_columnconfigure(0, weight=1)
+        button_frame.grid_columnconfigure(1, weight=1)
+
+        result = [None] # Use a list to pass by reference
+
+        def on_ok():
+            result[0] = True
+            dialog.destroy()
+            
+        def on_yes():
+            result[0] = True
+            dialog.destroy()
+            
+        def on_no():
+            result[0] = False
+            dialog.destroy()
+
+        if dialog_type == "info" or dialog_type == "error" or dialog_type == "warning":
+            ok_btn = ctk.CTkButton(
+                button_frame, text="OK", command=on_ok,
+                fg_color=self.current_theme["BTN_COLOR"],
+                text_color=self.current_theme["BTN_TEXT_COLOR"],
+                hover_color=self.current_theme["BTN_HOVER_COLOR"]
+            )
+            ok_btn.grid(row=0, column=0, columnspan=2, padx=5)
+            dialog.bind("<Return>", lambda e: on_ok())
+            
+        elif dialog_type == "askyesno":
+            button_frame.grid_columnconfigure(0, weight=1)
+            button_frame.grid_columnconfigure(1, weight=1)
+            
+            yes_btn = ctk.CTkButton(
+                button_frame, text="Yes", command=on_yes,
+                fg_color=self.current_theme["BTN_COLOR"],
+                text_color=self.current_theme["BTN_TEXT_COLOR"],
+                hover_color=self.current_theme["BTN_HOVER_COLOR"]
+            )
+            yes_btn.grid(row=0, column=0, sticky="ew", padx=5)
+            
+            no_btn = ctk.CTkButton(
+                button_frame, text="No", command=on_no,
+                fg_color=self.current_theme["ENTRY_COLOR"],
+                text_color=self.current_theme["TEXT_COLOR"],
+                hover_color=self.current_theme["MENU_COLOR"]
+            )
+            no_btn.grid(row=0, column=1, sticky="ew", padx=5)
+            dialog.bind("<Return>", lambda e: on_yes())
+
+        # Center the dialog
+        dialog.update_idletasks()
+        x = self.winfo_x() + (self.winfo_width() - dialog.winfo_width()) // 2
+        y = self.winfo_y() + (self.winfo_height() - dialog.winfo_height()) // 2
+        dialog.geometry(f"+{x}+{y}")
+        
+        dialog.wait_window() # Wait until dialog is closed
+        return result[0]
+
+    def _show_themed_info(self, title, message):
+        self._show_themed_dialog(title, message, "info")
+
+    def _show_themed_warning(self, title, message):
+        self._show_themed_dialog(title, message, "warning")
+
+    def _show_themed_error(self, title, message):
+        self._show_themed_dialog(title, message, "error")
+
+    def _show_themed_askyesno(self, title, message):
+        return self._show_themed_dialog(title, message, "askyesno")
+    # --- END THEMED DIALOGS ---
 
 
 if __name__ == "__main__":
